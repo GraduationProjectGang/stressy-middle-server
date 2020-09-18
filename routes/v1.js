@@ -3,11 +3,12 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const url = require('url');
 const fs = require('fs');
+const router = require('router');
 
-const { Device, Party, Token, User } = requrie('../models');
+const { Device, Party, Token, User } = require('../models');
 const { verifyTokenClient, verifyTokenGlobal } = require('./middleware');
 const { RequestHeaderFieldsTooLarge } = require('http-errors');
-const { where } = require('sequelize/types');
+// const { where } = require('sequelize/types');
 const { resolveSoa } = require('dns');
 
 router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
@@ -54,11 +55,16 @@ router.post('/model/client/update', verifyTokenGlobal, async (req, res) => {
           message: 'Device not found',
         });
       }
-      const party;
-      //SELECT * FROM parties where deviceId=${device_id} and where deletedAt is not null order by id desc limit 1;
-      if(!party){
-
-      }
+      //TODO
+      // const party = await party.findOne({
+      //     where: {
+      //         party: party,
+      //     },
+      // });
+      // //SELECT * FROM parties where deviceId=${device_id} and where deletedAt is not null order by id desc limit 1;
+      // if(!party){
+      //
+      // }
 
     } catch (error) {
         console.error(error);
@@ -87,11 +93,11 @@ router.post('/user/account/auth', async (req, res) => {
 
       const token = await token.findOne({
           where: {
-              token: fcm_token,
+              token: fcm_token
           },
       });
 
-      const token = jwt.sign({
+      const token2 = jwt.sign({
         id: user.id,
         name: user.name,
       }, process.env.JWT_SECRET, {
