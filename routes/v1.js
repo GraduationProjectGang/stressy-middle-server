@@ -3,11 +3,10 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const url = require('url');
 const fs = require('fs');
-const router = require('router');
+const router = express.Router();
 
 const { Device, Party, Token, User, sequelize } = require('../models');
 const { verifyTokenClient, verifyTokenGlobal, requestGlobalModel } = require('./middleware');
-const { where } = require('sequelize/types');
 const { QueryTypes } = require('sequelize');
 
 

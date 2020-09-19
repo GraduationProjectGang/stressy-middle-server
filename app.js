@@ -11,10 +11,9 @@ dotenv.config();
 const indexRouter = require('./routes');
 const v1 = require('./routes/v1');
 const { sequelize } = require('./models');
-const passportConfig = require('./passport');
 
 const app = express();
-passportConfig();
+
 app.set('port', process.env.PORT || 8002);
 app.set('view engine', 'html');
 nunjucks.configure('views', {
@@ -43,8 +42,6 @@ app.use(session({
     secure: false,
   },
 }));
-app.use(passport.initialize());
-app.use(passport.session());
 
 app.use('/', indexRouter);
 
