@@ -1,6 +1,9 @@
 const jwt = require('jsonwebtoken');
+const { Device, Party, Token, User, sequelize } = require('../models');
 
-
+exports.requestGlobalModel = (req, res, next) => {
+  
+};
 
 exports.verifyTokenClient = (req, res, next) => {
     try {

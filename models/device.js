@@ -31,6 +31,7 @@ module.exports = class Device extends Sequelize.Model{
 
     static associate(db) {
         db.Device.hasOne(db.Token);
+
         db.Device.belongsToMany(db.Party, {
             through: 'device_party',
         });

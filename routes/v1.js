@@ -5,15 +5,16 @@ const url = require('url');
 const fs = require('fs');
 const router = require('router');
 
-const { Device, Party, Token, User } = require('../models');
-const { verifyTokenClient, verifyTokenGlobal } = require('./middleware');
-const { RequestHeaderFieldsTooLarge } = require('http-errors');
-// const { where } = require('sequelize/types');
-const { resolveSoa } = require('dns');
+const { Device, Party, Token, User, sequelize } = require('../models');
+const { verifyTokenClient, verifyTokenGlobal, requestGlobalModel } = require('./middleware');
+const { where } = require('sequelize/types');
+const { QueryTypes } = require('sequelize');
+
 
 router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
     const { model_weight, party_id } = req.body;
     try {
+        
         const party = await Party.findOne({
             where: {
                 id: party_id,
@@ -29,6 +30,7 @@ router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
 
         devices = await party.getDevices();
         for(deivce of devices){
+            let token = await device.getToken();
             //update weight for each client
         }
 
@@ -41,8 +43,8 @@ router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
     }
 });
 
-router.post('/model/client/update', verifyTokenGlobal, async (req, res) => {
-    const { fcm_token, device_id } = req.body;
+router.post('/model/client/update', verifyTokenClient, async (req, res) => {
+    const { fcm_token, device_id, model_weight } = req.body;
     try {
       const device = await Device.findOne({
         where: {
@@ -55,17 +57,43 @@ router.post('/model/client/update', verifyTokenGlobal, async (req, res) => {
           message: 'Device not found',
         });
       }
-      //TODO
-      // const party = await party.findOne({
-      //     where: {
-      //         party: party,
-      //     },
-      // });
-      // //SELECT * FROM parties where deviceId=${device_id} and where deletedAt is not null order by id desc limit 1;
-      // if(!party){
-      //
-      // }
+      
+      // TODO: parsing model weight
 
+      let location = device.getLocation() | `../private/weight/device_${device_id}_weight`; 
+      fs.writeFileSync(location, model_weight, (err, data) => {
+        if(err){
+          console.error(error);
+          return res.status(500).json({
+            code: 500,
+            message: 'Device Location is invalid',
+          });
+        }
+      });
+
+      let party = await sequelize.query(
+       "SELECT * FROM parties where deletedAt is not null order by id desc limit 1",
+       {
+         type: QueryTypes.SELECT,
+       } 
+      );
+      if(!party | party.getSize() > process.env.UPDATE_THRESHOLD){
+        party = await Party.create({
+          size: 0,
+        });
+      };
+
+      if( party.getSize() > process.env.UPDATE_THRESHOLD ){
+        requestGlobalModel();
+      }
+
+      await party.setSize(party.getSize() + 1);
+      await party.addDevices(device);
+      return res.status(201).json({
+        code: 201,
+        message: "successful uploading data",
+      });
+     
     } catch (error) {
         console.error(error);
         return res.status(500).json({
@@ -90,13 +118,11 @@ router.post('/user/account/auth', async (req, res) => {
           message: '등록되지 않은 유저입니다.',
         });
       }
-
-      const token = await token.findOne({
+      const token = await Token.findOne({
           where: {
               token: fcm_token
           },
       });
-
       const token2 = jwt.sign({
         id: user.id,
         name: user.name,
@@ -104,12 +130,12 @@ router.post('/user/account/auth', async (req, res) => {
         expiresIn: '30m', // 30분
         issuer: 'stressy-middle',
       });
-      console.log(token)
+      console.log(token, token2)
       return res.json({
         code: 200,
         payload: JSON.stringify(user),
         message: '토큰이 발급되었습니다',
-        token,
+        token2,
       });
     } catch (error) {
       console.error(error);
@@ -119,3 +145,41 @@ router.post('/user/account/auth', async (req, res) => {
       });
     }
   });
+
+router.post('/user/account/signup', async (req, res) => {
+  const { user_email, user_pw, user_name, deivce_id } = req.body;
+  try {
+    
+    let user = await User.findOne({
+      where: { email: user_email }
+    });
+   
+    console.log(`select * from users where email='${user_email}'`);
+
+    if(user){
+      return res.status(202).json({
+        code: 202,
+        message: '등록된 유저 입니다.',
+      });
+    }
+
+    const newUser = await User.create({
+      email: user_email,
+      pw: user_pw,
+      name: user_name,
+    });
+    console.log(`insert into users values ${newUser}`);
+
+    return res.json({
+      code: 200,
+      payload: JSON.stringify(newUser),
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      code: 500,
+      message: '서버 에러',
+    });
+  }
+});
