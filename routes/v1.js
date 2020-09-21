@@ -5,10 +5,17 @@ const url = require('url');
 const fs = require('fs');
 const router = express.Router();
 
+
 const { Device, Party, Token, User, sequelize } = require('../models');
 const { verifyTokenClient, verifyTokenGlobal, requestGlobalModel } = require('./middleware');
-const { QueryTypes } = require('sequelize');
 
+//fcm init
+const admin = require("firebase-admin");
+var serviceAccount = require(".././serviceKey.json");
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://datacollect-18877.firebaseio.com"
+});
 
 router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
     const { model_weight, party_id } = req.body;
@@ -29,7 +36,25 @@ router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
 
         devices = await party.getDevices();
         for(deivce of devices){
-            let token = await device.getToken();
+            let registrationToken = await device.getToken();
+            var message = {
+              data: {
+                model_weight: model_weight,
+                title: '850',
+                time: '2:45'
+              },
+              registration_ids: registrationToken
+            };
+
+            admin.messaging().send(message)
+              .then((response) => {
+              // Response is a message ID string.
+              console.log('Successfully sent message:', response);
+              })
+              .catch((error) => {
+                console.log('Error sending message:', error);
+              });
+
             //update weight for each client
         }
 
