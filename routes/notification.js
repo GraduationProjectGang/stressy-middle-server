@@ -11,7 +11,7 @@ admin.initializeApp({
   databaseURL: "https://datacollect-18877.firebaseio.com"
 });
 
-const scheduleEnqueuing = async () =>{
+exports.scheduleEnqueuing = async () =>{
     const tokens = await Token.findAll();
     let registrationTokens = [];
     for (let i = 0; i < tokens.length; i++) {      
@@ -41,4 +41,3 @@ const scheduleEnqueuing = async () =>{
     }   
 };
 
-scheduleEnqueuing();
