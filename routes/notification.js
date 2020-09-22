@@ -25,6 +25,7 @@ const scheduleEnqueuing = async () =>{
             const message = {
                 data: {title: '850', body: '2:45'},
                 tokens: registrationTokens,
+                priority:10
             };
             //send message
             admin.messaging().sendMulticast(message)

@@ -14,6 +14,7 @@ const { sequelize } = require('./models');
 
 const app = express();
 
+var server = require('http').createServer(app);
 app.set('port', process.env.PORT || 8002);
 app.set('view engine', 'html');
 nunjucks.configure('views', {
