@@ -11,6 +11,7 @@ dotenv.config();
 const indexRouter = require('./routes');
 const v1 = require('./routes/v1');
 const { sequelize } = require('./models');
+const { schedulingEnqueuing } = require('./routes/notification');
 
 const app = express();
 
@@ -29,6 +30,7 @@ sequelize.sync({ force: false })
     console.error(err);
   });
 
+
 app.use(morgan('dev'));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
@@ -45,7 +47,7 @@ app.use(session({
 }));
 
 app.use('/', indexRouter);
-
+app.use('/v1', v1);
 
 app.use((req, res, next) => {
   const error =  new Error(`${req.method} ${req.url} 라우터가 없습니다.`);
@@ -59,6 +61,8 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500);
   res.render('error');
 });
+
+schedulingEnqueuing();
 
 app.listen(app.get('port'), () => {
   console.log(app.get('port'), '번 포트에서 대기중');

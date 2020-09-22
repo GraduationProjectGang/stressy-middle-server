@@ -10,7 +10,7 @@ module.exports = class Token extends Sequelize.Model{
                 allowNull: false,
             },
             token: {
-                type: Sequelize.STRING(100),
+                type: Sequelize.STRING(200),
                 allowNull: false,
             },
         }, {
