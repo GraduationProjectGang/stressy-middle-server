@@ -213,3 +213,63 @@ router.post('/user/account/signup', async (req, res) => {
     });
   }
 });
+
+//change password
+router.post('/user/account/changepw', async (req, res) => {
+  //TODO
+  const { user_email, new_pw } = req.body;
+  try {
+    let user = await User.findOne({
+      where: { email: user_email }
+    });
+   
+    console.log(`select * from users where email='${user_email}'`);
+
+    //아주 뇌피셜임
+    const this_user = await User.update({
+      pw:new_pw
+    });
+    
+    console.log(`update pw where email = ${user_email}`);
+
+    return res.json({
+      code: 200,
+      payload: JSON.stringify(this_user),
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      code: 500,
+      message: '서버 에러',
+    });
+  }
+});
+
+//change password
+router.delete('/user/account/withdraw', async (req, res) => {
+  //delete user from User
+  const { user_email, device_id } = req.body;
+  try {
+    let user = await User.destroy({
+      where: { email: user_email }
+    });
+    
+    console.log(`delete from users where email='${user_email}'`);
+    
+    return res.json({
+      code: 200,
+      message: "deleted successfully",
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      code: 500,
+      message: 'server error',
+    });
+  }
+
+  //delete token from Token
+  //TODO
+});
