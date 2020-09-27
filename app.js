@@ -7,11 +7,14 @@ const session = require('express-session');
 const nunjucks = require('nunjucks');
 const dotenv = require('dotenv');
 
+
 dotenv.config();
 const indexRouter = require('./routes');
 const v1 = require('./routes/v1');
+const webSocket = require('./socket');
 const { sequelize } = require('./models');
 const { schedulingEnqueuing } = require('./routes/notification');
+
 
 const app = express();
 
@@ -29,14 +32,7 @@ sequelize.sync({ force: false })
   .catch((err) => {
     console.error(err);
   });
-
-
-app.use(morgan('dev'));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser(process.env.COOKIE_SECRET));
-app.use(session({
+const sessionMiddleware = session({
   resave: false,
   saveUninitialized: false,
   secret: process.env.COOKIE_SECRET,
@@ -44,7 +40,15 @@ app.use(session({
     httpOnly: true,
     secure: false,
   },
-}));
+});
+
+
+app.use(morgan('dev'));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser(process.env.COOKIE_SECRET));
+app.use(sessionMiddleware);
 
 app.use('/', indexRouter);
 app.use('/v1', v1);
@@ -64,6 +68,8 @@ app.use((err, req, res, next) => {
 
 schedulingEnqueuing();
 
-app.listen(app.get('port'), () => {
+const server = app.listen(app.get('port'), () => {
   console.log(app.get('port'), '번 포트에서 대기중');
 });
+
+webSocket(server, app, sessionMiddleware);
