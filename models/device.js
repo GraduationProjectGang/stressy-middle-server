@@ -19,11 +19,11 @@ module.exports = class Device extends Sequelize.Model{
             }
         }, {
             sequelize,
-            timestamps: false,
+            timestamps: true,
             underscored: false,
             modelName: 'Device',
             tableName: 'devices',
-            paranoid: false,
+            paranoid: true,
             charset: 'utf8',
             collate: 'utf8_general_ci',
         });
