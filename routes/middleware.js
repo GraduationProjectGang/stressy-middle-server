@@ -5,7 +5,7 @@ exports.requestGlobalModel = (req, res, next) => {
   
 };
 
-exports.verifyTokenClient = (req, res, next) => {
+exports.verifyTokenClient = (req, res, next) => {//내가 발급한 jwt 토큰이 맞는지
     try {
       req.decoded = jwt.verify(req.headers.authorization, process.env.JWT_SECRET);
       console.log(req.decoded);
@@ -24,7 +24,7 @@ exports.verifyTokenClient = (req, res, next) => {
     }
   };
 
-exports.verifyTokenGlobal = (req, res, next) => {
+exports.verifyTokenGlobal = (req, res, next) => { //러닝서버랑 통신하는 토큰 
     try {
       req.decoded = jwt.verify(req.headers.authorization, process.env.JWT_SECRET_GLOBAL);
       console.log(req.decoded);

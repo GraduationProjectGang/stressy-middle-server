@@ -11,8 +11,10 @@ admin.initializeApp({
   databaseURL: "https://datacollect-18877.firebaseio.com"
 });
 
-exports.scheduleEnqueuing = async () =>{
+// exports.scheduleEnqueuing = async () =>{
+exports = async () =>{
     const tokens = await Token.findAll();
+    console.log(tokens);
     let registrationTokens = [];
     for (let i = 0; i < tokens.length; i++) {      
         console.log(tokens[i].token); 
@@ -20,8 +22,23 @@ exports.scheduleEnqueuing = async () =>{
     }
     
     try {
-        cron.schedule('*/2 * * * *', () => {
-            console.log('매 2분 마다 실행');
+        // cron.schedule('*/2 * * * *', () => {
+        //     console.log('매 2분 마다 실행');
+        //     const message = {
+        //         data: {title: '850', body: '2:45'},
+        //         tokens: registrationTokens,
+        //         priority:10
+        //     };
+        //     //send message
+        //     admin.messaging().sendMulticast(message)
+        //         .then((response) => {
+        //             // Response is a message ID string.
+        //             console.log('Successfully sent message:', response);
+        //         })
+        //         .catch((error) => {
+        //             console.log('Error sending message:', error);
+        //         });
+        // });
             const message = {
                 data: {title: '850', body: '2:45'},
                 tokens: registrationTokens,
@@ -36,7 +53,6 @@ exports.scheduleEnqueuing = async () =>{
                 .catch((error) => {
                     console.log('Error sending message:', error);
                 });
-        });
     } catch (error) {
         console.error(error);
     }   
