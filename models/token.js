@@ -10,16 +10,16 @@ module.exports = class Token extends Sequelize.Model{
                 allowNull: false,
             },
             token: {
-                type: Sequelize.STRING(100),
+                type: Sequelize.STRING(200),
                 allowNull: false,
             },
         }, {
             sequelize,
-            timestamps: false,
+            timestamps: true,
             underscored: false,
             modelName: 'Token',
             tableName: 'token',
-            paranoid: false,
+            paranoid: true,
             charset: 'utf8',
             collate: 'utf8_general_ci',
         });

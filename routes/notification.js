@@ -11,8 +11,10 @@ admin.initializeApp({
   databaseURL: "https://datacollect-18877.firebaseio.com"
 });
 
-const scheduleEnqueuing = async () =>{
+// exports.scheduleEnqueuing = async () =>{
+exports = async () =>{
     const tokens = await Token.findAll();
+    console.log(tokens);
     let registrationTokens = [];
     for (let i = 0; i < tokens.length; i++) {      
         console.log(tokens[i].token); 
@@ -36,10 +38,8 @@ const scheduleEnqueuing = async () =>{
                 .catch((error) => {
                     console.log('Error sending message:', error);
                 });
-        });
+            });
     } catch (error) {
         console.error(error);
     }   
 };
-
-scheduleEnqueuing();
