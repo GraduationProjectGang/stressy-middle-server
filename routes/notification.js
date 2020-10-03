@@ -20,11 +20,12 @@ const scheduleEnqueuing = async () =>{
     }
     
     try {
-        cron.schedule('*/2 * * * *', () => {
-            console.log('매 2분 마다 실행');
+        cron.schedule('*/3 * * * *', () => {
+            console.log('매 15분 마다 실행');
             const message = {
                 data: {title: '850', body: '2:45'},
                 tokens: registrationTokens,
+                priority:"10"
             };
             //send message
             admin.messaging().sendMulticast(message)
