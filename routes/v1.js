@@ -174,6 +174,33 @@ router.post('/user/account/auth', async (req, res) => {
     }
   });
 
+  //check if user's new email is valid
+  router.post('/user/account/validemail', async (req, res) => {
+    const { user_email } = req.body;
+    try {
+      
+      let user = await User.findOne({
+        where: { email: user_email }
+      });
+     
+      console.log(`select * from users where email='${user_email}'`);
+  
+      //이렇게 하는거 맞나?
+      if(!user){
+        return res.status(200).json({
+          code: 200,
+          message: 'valid user',
+        });
+      }  
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        code: 500,
+        message: '서버 에러',
+      });
+    }
+  });
+
 router.post('/user/account/signup', async (req, res) => {
   const { user_email, user_pw, user_name, deivce_id } = req.body;
   try {
