@@ -200,13 +200,15 @@ router.post('/user/account/auth', async (req, res) => {
   //check if user's new email is valid
   router.post('/user/account/validemail', async (req, res) => {
     const { user_email } = req.body;
+    console.log(req);
+    
     try {
       
       let user = await User.findOne({
         where: { email: user_email }
       });
      
-      console.log(`select * from users where email='${user_email}'`);
+      console.log(`select * from users where email='${user_email}' limit 1`);
   
       //이렇게 하는거 맞나?
       if(!user){
@@ -225,7 +227,7 @@ router.post('/user/account/auth', async (req, res) => {
   });
 
 router.post('/user/account/signup', async (req, res) => {
-  const { user_email, user_pw, user_name, deivce_id } = req.body;
+  const { user_email, user_pw, user_name, deivce_id, user_gender } = req.body;
   try {
     
     let user = await User.findOne({
