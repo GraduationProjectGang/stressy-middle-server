@@ -5,14 +5,14 @@ const cron = require('node-cron');
 const { Device, Party, Token, User, sequelize } = require('../models');
 
 //fcm init
-var serviceAccount = require(".././serviceKey.json");
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://datacollect-18877.firebaseio.com"
-});
+// var serviceAccount = require(".././serviceKey.json");
+// admin.initializeApp({
+//   credential: admin.credential.cert(serviceAccount),
+//   databaseURL: "https://datacollect-18877.firebaseio.com"
+// });
 
 // exports.scheduleEnqueuing = async () =>{
-exports = async () =>{
+exports.scheduleEnqueuing = async () =>{
     const tokens = await Token.findAll();
     console.log(tokens);
     let registrationTokens = [];

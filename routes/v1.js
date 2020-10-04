@@ -2,15 +2,20 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
+const dotenv = require('dotenv');
 const url = require('url');
 const fs = require('fs');
+const admin = require("firebase-admin");
+
 const router = express.Router();
 
 const { Device, Party, Token, User, sequelize } = require('../models');
 const { verifyTokenClient, verifyTokenGlobal, requestGlobalModel } = require('./middleware');
 
+dotenv.config();
+
 //fcm init
-const admin = require("firebase-admin");
+
 var serviceAccount = require(".././serviceKey.json");
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -18,6 +23,24 @@ admin.initializeApp({
 });
 
 //Called when the update of the global model is complete.
+router.post('/test', async (req, res) => {
+  console.log("hihi")
+  try {
+  
+      console.log('Successful:', res);
+      return res.status(200).json({
+        code: 200,
+        message: `successful`
+      });
+  } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+          code: 500,
+          message: 'update failed',
+      });
+  }
+});
+
 router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
     const { model_weight, party_id } = req.body;
     try {
@@ -317,3 +340,5 @@ router.delete('/user/account/withdraw', async (req, res) => {
     });
   }
 });
+
+module.exports = router;

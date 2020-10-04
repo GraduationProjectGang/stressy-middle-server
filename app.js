@@ -13,12 +13,11 @@ const indexRouter = require('./routes');
 const v1 = require('./routes/v1');
 const webSocket = require('./socket');
 const { sequelize } = require('./models');
-const { schedulingEnqueuing } = require('./routes/notification');
+const { scheduleEnqueuing } = require('./routes/notification');
 
 
 const app = express();
 
-var server = require('http').createServer(app);
 app.set('port', process.env.PORT || 8002);
 app.set('view engine', 'html');
 nunjucks.configure('views', {
@@ -64,9 +63,10 @@ app.use((err, req, res, next) => {
   res.locals.error = process.env.NODE_ENV !== 'production' ? err : {};
   res.status(err.status || 500);
   res.render('error');
+  console.error(err);
 });
 
-schedulingEnqueuing();
+scheduleEnqueuing();
 
 const server = app.listen(app.get('port'), () => {
   console.log(app.get('port'), '번 포트에서 대기중');
