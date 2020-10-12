@@ -3,7 +3,6 @@ const admin = require("firebase-admin");
 const cron = require('node-cron');
 //sequelize model
 const { Device, Party, Token, User, sequelize } = require('../models');
-
 //fcm init
 // var serviceAccount = require(".././serviceKey.json");
 // admin.initializeApp({
@@ -12,23 +11,27 @@ const { Device, Party, Token, User, sequelize } = require('../models');
 // });
 
 // exports.scheduleEnqueuing = async () =>{
+
+
 exports.scheduleEnqueuing = async () =>{
     const tokens = await Token.findAll();
     console.log(tokens);
     let registrationTokens = [];
     for (let i = 0; i < tokens.length; i++) {      
-        console.log(tokens[i].token); 
-        registrationTokens.push(tokens[i].token);
+        console.log(tokens[i].tokenId); 
+        registrationTokens.push(tokens[i].tokenId);
     }
     
     try {
-        cron.schedule('*/3 * * * *', () => {
+        cron.schedule('*/15 * * * *', () => {
+            require('log-timestamp');
             console.log('매 15분 마다 실행');
             const message = {
-                data: {title: '850', body: '2:45'},
+                data: {title: 'dataCollect', body: 'dataCollect'},
                 tokens: registrationTokens,
                 priority:"10"
             };
+            
             //send message
             admin.messaging().sendMulticast(message)
                 .then((response) => {

@@ -197,6 +197,47 @@ router.post('/user/account/auth', async (req, res) => {
     }
   });
 
+//on new fcm token
+router.post('/user/fcm/newtoken', async (req, res) => {
+  const { fcm_token } = req.body;
+  console.log(req);
+  
+  try {
+    
+    let token = await Token.findOne({
+      where: { tokenId: fcm_token }
+    });
+    
+    console.log(`select * from token where tokenId='${fcm_token}'`);
+
+    if(token){
+      return res.status(301).json({
+        code: 301,
+        message: '등록된 토큰 입니다.',
+      });
+    }
+
+    const newToken = await Token.create({
+      tokenId: fcm_token,
+    });
+
+    console.log(`insert into token values ${newToken}`);
+
+    return res.json({
+      code: 200,
+      payload: JSON.stringify(newToken),
+    });
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      code: 500,
+      message: '서버 에러',
+    });
+  }
+});
+
+
   //check if user's new email is valid
   router.post('/user/account/validemail', async (req, res) => {
     const { user_email } = req.body;

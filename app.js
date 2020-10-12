@@ -7,13 +7,12 @@ const session = require('express-session');
 const nunjucks = require('nunjucks');
 const dotenv = require('dotenv');
 
-
 dotenv.config();
 const indexRouter = require('./routes');
 const v1 = require('./routes/v1');
 const webSocket = require('./socket');
 const { sequelize } = require('./models');
-const { scheduleEnqueuing } = require('./routes/notification');
+const { scheduleEnqueuing } = require('./routes/notification_data');
 
 
 const app = express();
@@ -40,7 +39,6 @@ const sessionMiddleware = session({
     secure: false,
   },
 });
-
 
 app.use(morgan('dev'));
 app.use(express.static(path.join(__dirname, 'public')));
