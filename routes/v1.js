@@ -23,21 +23,21 @@ admin.initializeApp({
 });
 
 //Called when the update of the global model is complete.
+// Global Model 갱신 완료 시 호출
 router.post('/test', async (req, res) => {
   console.log("hihi")
   try {
-  
-      console.log('Successful:', res);
-      return res.status(200).json({
-        code: 200,
-        message: `successful`
-      });
+    console.log('Successful:', res);
+    return res.status(200).json({
+      code: 200,
+      message: `successful`
+    });
   } catch (error) {
-      console.error(error);
-      return res.status(500).json({
-          code: 500,
-          message: 'update failed',
-      });
+    console.error(error);
+    return res.status(500).json({
+        code: 500,
+        message: 'update failed',
+    });
   }
 });
 
