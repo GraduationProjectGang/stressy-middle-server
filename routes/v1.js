@@ -239,33 +239,33 @@ router.post('/user/fcm/newtoken', async (req, res) => {
 
 
   //check if user's new email is valid
-  router.post('/user/account/validemail', async (req, res) => {
-    const { user_email } = req.body;
-    console.log(req);
-    
-    try {
-      
-      let user = await User.findOne({
-        where: { email: user_email }
-      });
-     
-      console.log(`select * from users where email='${user_email}' limit 1`);
+router.post('/user/account/validemail', async (req, res) => {
+  const { user_email } = req.body;
+  console.log(req);
   
-      //이렇게 하는거 맞나?
-      if(!user){
-        return res.status(200).json({
-          code: 200,
-          message: 'valid user',
-        });
-      }  
-    } catch (error) {
-      console.error(error);
-      return res.status(500).json({
-        code: 500,
-        message: '서버 에러',
+  try {
+    
+    let user = await User.findOne({
+      where: { email: user_email }
+    });
+    
+    console.log(`select * from users where email='${user_email}' limit 1`);
+
+    //이렇게 하는거 맞나?
+    if(!user){
+      return res.status(200).json({
+        code: 200,
+        message: 'valid user',
       });
-    }
-  });
+    }  
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      code: 500,
+      message: '서버 에러',
+    });
+  }
+});
 
 router.post('/user/account/signup', async (req, res) => {
   const { user_email, user_pw, user_name, deivce_id, user_gender } = req.body;
@@ -362,13 +362,13 @@ router.delete('/user/account/withdraw', async (req, res) => {
   }
 
   //delete token from Token
-  //TODO
+
   try {
     let token = await Token.destroy({
-      where: { token: fcm_token }
+      where: { tokenId: fcm_token }
     });
     
-    console.log(`delete from users where token='${fcm_token}'`);
+    console.log(`delete from users where tokenId='${fcm_token}'`);
     
     return res.json({
       code: 200,
