@@ -6,6 +6,7 @@ const dotenv = require('dotenv');
 const url = require('url');
 const fs = require('fs');
 const admin = require("firebase-admin");
+const bcrypt = require('bcrypt');
 
 const router = express.Router();
 
@@ -158,12 +159,19 @@ router.post('/model/client/update', verifyTokenClient, async (req, res) => {
         email: user_email,
       }
     });
-    if (!user) {
+    let party = await Party.findOne({
+      where: {
+        id: party_id,
+      }
+    });
+    
+    if (!user | !party) {
       return res.status(304).json({
         code: 304,
-        message: 'user not found',
+        message: 'undefined id ',
       });
     }
+   
 
     // TODO: aggregation
     
@@ -179,20 +187,12 @@ router.post('/model/client/update', verifyTokenClient, async (req, res) => {
       }
     });
     // TODO: aggregation
-
-    //finding last added party
-    let party = await Party.findOne({
-      where: {
-        id: party_id,
-      }
-    });
-
-    if (party.size > process.env.CLIENT_THRESHOLD) {
-      requestGlobalModel();
-    }
-    //Adding the current device to the party.
     party.size++;
     await party.sync();
+    if (party.size == process.env.CLIENT_THRESHOLD * 2) {
+      requestGlobalModel();
+    }
+    
     return res.status(201).json({
       code: 201,
       message: "successful uploading data",
@@ -210,10 +210,11 @@ router.post('/model/client/update', verifyTokenClient, async (req, res) => {
 router.post('/user/account/auth', async (req, res) => {
     const { user_email, user_pw } = req.body;
     try {
+      const hash = await bcrypt.hash(password, 12);
       const user = await User.findOne({
         where: { 
           email: user_email, 
-          pw: user_pw,
+          pw: hash,
         },
       });
       if (!user) {
@@ -248,7 +249,7 @@ router.post('/user/account/auth', async (req, res) => {
 
 //on new fcm token
 router.post('/user/fcm/newtoken', async (req, res) => {
-  const { fcm_token } = req.body;
+  const { user_email, fcm_token } = req.body;
   console.log(req);
 
   try {
@@ -264,7 +265,7 @@ router.post('/user/fcm/newtoken', async (req, res) => {
         message: '등록된 토큰 입니다.',
       });
     }
-
+    
     const newToken = await Token.create({
       tokenId: fcm_token,
     });
@@ -288,7 +289,7 @@ router.post('/user/fcm/newtoken', async (req, res) => {
 
 //check if user's new email is valid
 router.post('/user/account/validemail', async (req, res) => {
-  const { user_email } = req.body;
+  const { user_email,  } = req.body;
   console.log(req);
 
   try {
@@ -320,32 +321,35 @@ router.post('/user/account/validemail', async (req, res) => {
 });
 
 router.post('/user/account/signup', async (req, res) => {
-  const { user_email, user_pw, user_name, user_gender, user_bd } = req.body;
+  const { user_email, user_pw, user_name, user_gender, user_bd, fcm_token } = req.body;
   try {
     
-    // let user = await User.findOne({
-    //   where: { email: user_email }
-    // });
-   
-    // console.log(`select * from users where email='${user_email}'`);
+    let user = await User.findOne({
+      where: { email: user_email }
+    });
+    const token = await Token.findOrCreate({
+      where: { token: fcm_token },
+    })
+    console.log(`select * from users where email='${user_email}'`);
 
-    // if(user){
-    //   return res.status(202).json({
-    //     code: 202,
-    //     message: '등록된 유저 입니다.',
-    //   });
-    // }
-
-    const newUser = await User.create({
+    if(user){
+      return res.status(202).json({
+        code: 202,
+        message: '등록된 유저 입니다.',
+      });
+    }
+    const hash = await bcrypt.hash(user_pw, 12); 
+    user = await User.create({
       email: user_email,
-      pw: user_pw,
+      pw: hash,
       name: user_name,
     });
+    await user.addToken(token);
     console.log(`insert into users values ${newUser}`);
-
+    
     return res.json({
       code: 200,
-      payload: JSON.stringify(newUser),
+      payload: JSON.stringify(user),
     });
 
   } catch (error) {
