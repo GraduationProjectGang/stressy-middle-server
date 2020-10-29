@@ -12,6 +12,7 @@ module.exports = class Party extends Sequelize.Model{
             size: {
                 type: Sequelize.INTEGER,
             },
+            
         }, {
             sequelize,
             timestamps: true,
@@ -25,8 +26,8 @@ module.exports = class Party extends Sequelize.Model{
     };
 
     static associate(db) {
-        db.Party.belongsToMany(db.Device, {
-            through: 'device_party',
+        db.Party.belongsToMany(db.User, {
+            through: 'user_party',
         });
     }
 };

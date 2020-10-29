@@ -26,6 +26,6 @@ module.exports = class Token extends Sequelize.Model{
     };
 
     static associate(db) {
-        db.Token.belongsTo(db.Device);
+        db.Token.hasOne(db.User);
     }
 };
