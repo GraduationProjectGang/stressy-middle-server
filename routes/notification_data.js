@@ -47,5 +47,5 @@ exports.scheduleEnqueuing = async () =>{
             });
     } catch (error) {
         console.error(error);
-    }   
+    }
 };

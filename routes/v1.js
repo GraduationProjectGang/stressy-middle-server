@@ -208,46 +208,42 @@ router.post('/model/client/update', verifyTokenClient, async (req, res) => {
 
 //Called when users login 
 router.post('/user/account/auth', async (req, res) => {
-  const { user_email, user_pw, fcm_token } = req.body;
-  try {
-    const user = await User.findOne({
-      where: {
-        email: user_email,
-        pw: user_pw,
-      },
-    });
-    if (!user) {
-      return res.status(304).json({
-        code: 304,
-        message: '등록되지 않은 유저입니다.',
+    const { user_email, user_pw } = req.body;
+    try {
+      const user = await User.findOne({
+        where: { 
+          email: user_email, 
+          pw: user_pw,
+        },
+      });
+      if (!user) {
+        return res.status(304).json({
+          code: 304,
+          message: '등록되지 않은 유저입니다.',
+        });
+      }
+
+      const jwtToken = jwt.sign({
+        id: user.id,
+        email: user.email,
+      }, process.env.JWT_SECRET, {
+        expiresIn: '30m', // 30분
+        issuer: 'stressy-middle',
+      });
+      console.log(jwtToken)
+      return res.json({
+        code: 200,
+        payload: JSON.stringify(user),
+        message: '토큰이 발급되었습니다',
+        jwtToken,
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        code: 500,
+        message: '서버 에러',
       });
     }
-    const token = await Token.findOne({
-      where: {
-        token: fcm_token
-      },
-    });
-    const jwtToken = jwt.sign({
-      id: user.id,
-      name: user.name,
-    }, process.env.JWT_SECRET, {
-      expiresIn: '30000m', // 30분
-      issuer: 'stressy-middle',
-    });
-    console.log(token, jwtToken)
-    return res.json({
-      code: 200,
-      payload: JSON.stringify(user),
-      message: '토큰이 발급되었습니다',
-      jwtToken,
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      code: 500,
-      message: '서버 에러',
-    });
-  }
 });
 
 //on new fcm token
@@ -296,15 +292,19 @@ router.post('/user/account/validemail', async (req, res) => {
   console.log(req);
 
   try {
-
-    let user = await User.findOne({
+    
+    let user = await User.findAll({
       where: { email: user_email }
     });
-
-    console.log(`select * from users where email='${user_email}' limit 1`);
-
-    //이렇게 하는거 맞아
-    if (!user) {
+    
+    console.log(`select * from users where email='${user_email}'`);
+    console.log(user.length);
+    if(user.length){
+      return res.status(503).json({
+        code: 503,
+        message: 'signed user',
+      });
+    }else{
       return res.status(200).json({
         code: 200,
         message: 'valid user',
@@ -320,21 +320,21 @@ router.post('/user/account/validemail', async (req, res) => {
 });
 
 router.post('/user/account/signup', async (req, res) => {
-  const { user_email, user_pw, user_name, deivce_id, user_gender } = req.body;
+  const { user_email, user_pw, user_name, user_gender, user_bd } = req.body;
   try {
+    
+    // let user = await User.findOne({
+    //   where: { email: user_email }
+    // });
+   
+    // console.log(`select * from users where email='${user_email}'`);
 
-    let user = await User.findOne({
-      where: { email: user_email }
-    });
-
-    console.log(`select * from users where email='${user_email}'`);
-
-    if (user) {
-      return res.status(202).json({
-        code: 202,
-        message: '등록된 유저 입니다.',
-      });
-    }
+    // if(user){
+    //   return res.status(202).json({
+    //     code: 202,
+    //     message: '등록된 유저 입니다.',
+    //   });
+    // }
 
     const newUser = await User.create({
       email: user_email,
