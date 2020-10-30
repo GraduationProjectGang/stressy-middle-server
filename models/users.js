@@ -9,7 +9,7 @@ module.exports = class User extends Sequelize.Model{
                 autoIncrement: true,
                 allowNull: false,
             },
-            name: {
+            email: {
                 type: Sequelize.STRING(45),
                 allowNull: false,
             },
@@ -17,8 +17,12 @@ module.exports = class User extends Sequelize.Model{
                 type: Sequelize.STRING(100),
                 allowNull: false,
             },
-            email: {
+            name: {
                 type: Sequelize.STRING(45),
+                allowNull: false,
+            },
+            gender: {
+                type: Sequelize.INTEGER(1),
                 allowNull: false,
             },
             birthday: {
