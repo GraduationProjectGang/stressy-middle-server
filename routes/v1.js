@@ -320,7 +320,7 @@ router.post('/user/account/validemail', async (req, res) => {
 });
 
 router.post('/user/account/signup', async (req, res) => {
-  const { user_email, user_pw, user_name, user_gender, user_bd } = req.body;
+  const { user_email, user_pw, user_name, user_gender, user_bd, user_token } = req.body;
   try {
     
     // let user = await User.findOne({
@@ -340,7 +340,11 @@ router.post('/user/account/signup', async (req, res) => {
       email: user_email,
       pw: user_pw,
       name: user_name,
+      gender: user_gender,
+      birthday: user_bd,
+      TokenId: user_token
     });
+
     console.log(`insert into users values ${newUser}`);
 
     return res.json({

@@ -22,11 +22,15 @@ module.exports = class User extends Sequelize.Model{
                 allowNull: false,
             },
             gender: {
-                type: Sequelize.INTEGER,
+                type: Sequelize.STRING(10),
                 allowNull: false,
             },
             birthday: {
                 type: Sequelize.STRING(8),
+                allowNull: false,
+            },
+            tokenId:{
+                type: Sequelize.STRING(200),
                 allowNull: false,
             }
         }, {
