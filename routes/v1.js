@@ -207,10 +207,10 @@ router.post('/model/client/update', verifyTokenClient, async (req, res) => {
 });
 
 //Called when users login 
-router.post('/user/account/auth', async (req, res) => {
+router.post('/user/account/auth', async (req, res) => { 
     const { user_email, user_pw } = req.body;
     try {
-      const hash = await bcrypt.hash(password, 12);
+      const hash = await bcrypt.hash(user_pw, 12);
       const user = await User.findOne({
         where: { 
           email: user_email, 
@@ -218,8 +218,9 @@ router.post('/user/account/auth', async (req, res) => {
         },
       });
       if (!user) {
-        return res.status(304).json({
-          code: 304,
+        
+        return res.status(404).json({
+          code: 404,
           message: '등록되지 않은 유저입니다.',
         });
       }
