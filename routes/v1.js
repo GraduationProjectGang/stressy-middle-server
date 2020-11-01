@@ -93,7 +93,7 @@ router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
 
 router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => {
   const { user_email, } = req.decoded;
-  const { round, } = req.body;
+  const { round, pk1, pk2 } = req.body;
   try {
     //find User
     const user = await User.findOne({
@@ -129,9 +129,9 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
     }
     //Adding the current user to the party.
     await sequelize.query(
-      "INSERT INTO user_party VALUES (NOW(), NOW(), :party_id, :user_id, :round)",
+      "INSERT INTO user_party VALUES (NOW(), NOW(), :party_id, :user_id, :round, :pk1, :pk2)",
       {
-        replacements: { party_id, user_id, round },
+        replacements: { party_id, user_id, round, pk1, pk2 },
         type: QueryTypes.INSERT,
       }
     );
@@ -224,11 +224,11 @@ router.post('/user/account/auth', async (req, res) => {
         });
       }
 
-      const jwtToken = jwt.sign({
+      const jwToken = jwt.sign({
         id: user.id,
         email: user.email,
       }, process.env.JWT_SECRET, {
-        expiresIn: '30m', // 30분
+        expiresIn: '30000m', // 30000분
         issuer: 'stressy-middle',
       });
       console.log(jwtToken)
@@ -237,6 +237,7 @@ router.post('/user/account/auth', async (req, res) => {
         payload: JSON.stringify(user),
         message: '토큰이 발급되었습니다',
         jwtToken,
+        expiresIn: 30000,
       });
     } catch (error) {
       console.error(error);
