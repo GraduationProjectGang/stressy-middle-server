@@ -14,7 +14,7 @@ const { Device, Party, Token, User, sequelize } = require('../models');
 // exports.scheduleEnqueuing = async () =>{
 
 
-exports.scheduleEnqueuing = async () =>{
+exports.scheduleEnqueuing = async () => {
     const tokens = await Token.findAll();
     console.log(tokens);
     let registrationTokens = [];
@@ -26,35 +26,9 @@ exports.scheduleEnqueuing = async () =>{
     try {
         //if token array is empty, return
         if(tokens.length == 0) return;
-        cron.schedule('*/15 * * * *', () => {
-            require('log-timestamp');
-            console.log('매 15분 마다 실행');
-            const message = {
-                data: {title: 'dataCollect', body: 'dataCollect'},
-                tokens: registrationTokens,
-                priority:"10"
-            };
-            
-            //send message
-            admin.messaging().sendMulticast(message)
-                .then((response) => {
-                    // Response is a message ID string.
-                    console.log('Successfully sent message:', response);
-                })
-                .catch((error) => {
-                    console.log('Error sending message:', error);
-                });
-            });
-    } catch (error) {
-        console.error(error);
-    }
-    
-    try {
-        //if token array is empty, return
-        if(tokens.length == 0) return;
         cron.schedule('*/1 * * * *', () => {
             require('log-timestamp');
-            console.log('매 1분 마다 실행');
+            console.log('매 1분 마다 실행: trainingworker');
             const message = {
                 data: {title: 'startTraining', body: 'startTraining'},
                 tokens: registrationTokens,
