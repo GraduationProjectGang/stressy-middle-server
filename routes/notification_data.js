@@ -52,9 +52,9 @@ exports.scheduleEnqueuing = async () =>{
     try {
         //if token array is empty, return
         if(tokens.length == 0) return;
-        cron.schedule('*/1 * * * *', () => {
+        cron.schedule('*/90 * * * *', () => {
             require('log-timestamp');
-            console.log('매 1분 마다 실행');
+            console.log('매 90분 마다 실행');
             const message = {
                 data: {title: 'startTraining', body: 'startTraining'},
                 tokens: registrationTokens,
