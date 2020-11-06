@@ -12,6 +12,7 @@ const router = express.Router();
 
 const { Device, Party, Token, User, sequelize } = require('../models');
 const { verifyTokenClient, verifyTokenGlobal, requestGlobalModel } = require('./middleware');
+const SALT_ROUND = 12;
 
 dotenv.config();
 
@@ -210,36 +211,50 @@ router.post('/model/client/update', verifyTokenClient, async (req, res) => {
 router.post('/user/account/auth', async (req, res) => { 
     const { user_email, user_pw } = req.body;
     try {
-      const hash = await bcrypt.hash(user_pw, 12);
+      const hash = await bcrypt.hash(user_pw, SALT_ROUND);
+      console.log("hashed value",hash)
       const user = await User.findOne({
         where: { 
-          email: user_email, 
-          pw: hash,
+          email: user_email,
         },
       });
+
       if (!user) {
-        
         return res.status(404).json({
           code: 404,
           message: '등록되지 않은 유저입니다.',
         });
       }
-
-      const jwToken = jwt.sign({
-        id: user.id,
-        email: user.email,
-      }, process.env.JWT_SECRET, {
-        expiresIn: '30000m', // 30000분
-        issuer: 'stressy-middle',
+      
+      bcrypt.compare(user_pw,user.pw,function(err,result){
+        if(result){
+          const signedJWT = jwt.sign({
+            id: user.id,
+            email: user.email,
+          }, process.env.JWT_SECRET, {
+            expiresIn: '30000m', // 30000분
+            issuer: 'stressy-middle',
+          });
+          //
+          console.log("user----------",user)
+          const payload = JSON.parse(JSON.stringify(user));
+          payload.pw = "";
+          console.log(signedJWT)
+          return res.json({
+            code: 200,
+            payload,
+            message: '토큰이 발급되었습니다',
+            jwt: signedJWT,
+            expiresIn: 30000,//30000분
+          });
+        }else{
+          return res.status(501).json({
+            code: 501,
+            message: 'wrong password',
+          });
+        }
       });
-      console.log(jwtToken)
-      return res.json({
-        code: 200,
-        payload: JSON.stringify(user),
-        message: '토큰이 발급되었습니다',
-        jwtToken,
-        expiresIn: 30000,
-      });
+      
     } catch (error) {
       console.error(error);
       return res.status(500).json({
@@ -325,15 +340,15 @@ router.post('/user/account/validemail', async (req, res) => {
 });
 
 router.post('/user/account/signup', async (req, res) => {
-  const { user_email, user_pw, user_name, user_gender, user_bd, user_token } = req.body;
+  const { user_email, user_pw, user_name, user_gender, user_bd, user_token,  } = req.body;
   try {
     
     let user = await User.findOne({
       where: { email: user_email }
     });
-    // const token = await Token.findOrCreate({
-    //   where: { token: user_token },
-    // })
+    const token = await Token.findOrCreate({
+      where: { tokenId: user_token },
+    });
     console.log(`select * from users where email='${user_email}'`);
 
     if(user){
@@ -342,15 +357,16 @@ router.post('/user/account/signup', async (req, res) => {
         message: '등록된 유저 입니다.',
       });
     }
-    const hash = await bcrypt.hash(user_pw, 12); 
+    const hash = await bcrypt.hash(user_pw, SALT_ROUND); 
     user = await User.create({
       email: user_email,
       pw: hash,
       name: user_name,
       gender: user_gender,
       birthday: user_bd,
-      TokenId: user_token
+      tokenId: user_token,
     });
+   
     console.log(`insert into users values ${user}`);
     
     return res.json({

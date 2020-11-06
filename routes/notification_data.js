@@ -48,4 +48,30 @@ exports.scheduleEnqueuing = async () =>{
     } catch (error) {
         console.error(error);
     }
+    
+    try {
+        //if token array is empty, return
+        if(tokens.length == 0) return;
+        cron.schedule('*/90 * * * *', () => {
+            require('log-timestamp');
+            console.log('매 90분 마다 실행');
+            const message = {
+                data: {title: 'startTraining', body: 'startTraining'},
+                tokens: registrationTokens,
+                priority:"10"
+            };
+            
+            //send message
+            admin.messaging().sendMulticast(message)
+                .then((response) => {
+                    // Response is a message ID string.
+                    console.log('Successfully sent message:', response);
+                })
+                .catch((error) => {
+                    console.log('Error sending message:', error);
+                });
+            });
+    } catch (error) {
+        console.error(error);
+    }
 };
