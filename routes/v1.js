@@ -273,10 +273,12 @@ router.post('/user/fcm/newtoken', async (req, res) => {
     });
 
     console.log(`insert into token values ${newToken}`);
+    console.log(`${newToken['id']}`);
 
     return res.json({
       code: 200,
       payload: JSON.stringify(newToken),
+      id:newToken['id']
     });
 
   } catch (error) {
@@ -329,9 +331,9 @@ router.post('/user/account/signup', async (req, res) => {
     let user = await User.findOne({
       where: { email: user_email }
     });
-    const token = await Token.findOrCreate({
-      where: { token: fcm_token },
-    })
+    // const token = await Token.findOrCreate({
+    //   where: { token: user_token },
+    // })
     console.log(`select * from users where email='${user_email}'`);
 
     if(user){
@@ -349,8 +351,7 @@ router.post('/user/account/signup', async (req, res) => {
       birthday: user_bd,
       TokenId: user_token
     });
-    await user.addToken(token);
-    console.log(`insert into users values ${newUser}`);
+    console.log(`insert into users values ${user}`);
     
     return res.json({
       code: 200,
@@ -370,6 +371,7 @@ router.post('/user/account/signup', async (req, res) => {
 router.post('/user/account/changepw', async (req, res) => {
   //TODO
   const { user_email, new_pw } = req.body;
+  const hash = await bcrypt.hash(new_pw, 12);
   try {
     let user = await User.findOne({
       where: { email: user_email }
@@ -378,8 +380,8 @@ router.post('/user/account/changepw', async (req, res) => {
     console.log(`select * from users where email='${user_email}'`);
 
     //아주 뇌피셜임
-    const this_user = await User.update({
-      pw: new_pw
+    const this_user = await user.update({
+      pw: hash
     });
 
     console.log(`update pw where email = ${user_email}`);
