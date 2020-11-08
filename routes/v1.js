@@ -7,6 +7,9 @@ const url = require('url');
 const fs = require('fs');
 const admin = require("firebase-admin");
 const bcrypt = require('bcrypt');
+const sr = require('secure-random');
+const math = require('mathjs');
+const { QueryTypes, Sequelize } = require('sequelize');
 
 const router = express.Router();
 
@@ -16,31 +19,34 @@ const SALT_ROUND = 12;
 
 dotenv.config();
 
-//fcm init
+let nm = 1000000n;
 
+let r = sr(1)[0].toString();
+console.log(r);
+let bigR = BigInt(r);
+console.log(bigR);
+let idx = 1;
+
+do {
+  let multi = BigInt(math.pow(10, idx))
+  console.log(multi);
+  bigR = bigR * multi;
+  idx = idx + 1;
+  console.log(bigR, idx, nm);
+} while (bigR >= nm);
+
+const encryptIndex = (plain, n, g, nSquared) => {
+  
+  return (g ** plain) * (r ** n) % (nSquared)
+}
+
+
+//fcm init
 var serviceAccount = require(".././serviceKey.json");
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   databaseURL: "https://datacollect-18877.firebaseio.com"
-});
-
-//Called when the update of the global model is complete.
-// Global Model 갱신 완료 시 호출
-router.post('/test', async (req, res) => {
-  console.log("hihi")
-  try {
-    console.log('Successful:', res);
-    return res.status(200).json({
-      code: 200,
-      message: `successful`
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      code: 500,
-      message: 'update failed',
-    });
-  }
 });
 
 router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
@@ -92,9 +98,23 @@ router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
   }
 });
 
+const sr_int = sr(1);
+const sr_float = sr(1);
+let sr_final = Array(1);
+
+for (let i = 0; i < sr_float.length; i++) {
+  sr_float[i] = sr_float[i] * Math.pow(10, -4);
+
+  sr_final[i] = sr_int[i] + sr_float[i];
+
+  console.log(sr_final[i]);
+}
+
+console.log(sr_int);
+
 router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => {
   const { user_email, } = req.decoded;
-  const { round, pk1, pk2 } = req.body;
+  const { count ,pk1, pk2, pk3 } = req.body;
   try {
     //find User
     const user = await User.findOne({
@@ -115,6 +135,7 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
         type: QueryTypes.SELECT,
       }
     );
+    const party_id = party.id;
 
     //if the party does not exist or has exceeded the Threshold.
     if (!party | party.size > process.env.CLIENT_THRESHOLD) {
@@ -125,14 +146,50 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
     }
     
     if (party.size > process.env.CLIENT_THRESHOLD) {
-      //TODO: Request to KGC
+      //TODO: Request to FCM(firebase cloud messaging)
+      const users = await sequelize.query(
+        "SELECT L.id, (SELECT tokenId AS fcmTokenID FROM token WHERE id = L.tokenId), R.pk_n, R.pk_nSquared, R.pk_g, R.maskalue from `users` AS L JOIN user_party AS R ON L.id = R.UserId WHERE R.partyId = 1;",
+        {
+          replacements: { party_id },
+          type: QueryTypes.SELECT,
+        }
+      );
+      tokens = [];
+      //add fcm token
+      users.forEach(user => {
+        toknes.add(user.fcmTokenID);
+      });
+
+      //TODO: generate public table and  PaillierEncryption(PK, i)
+      try {
+        const message = {
+          data: {title: 'weightRequest', body: 'weightRequest'},
+          tokens: tokens,
+          priority:"10"
+      };
       
+      //send message
+      admin.messaging().sendMulticast(message)
+          .then((response) => {
+              // Response is a message ID string.
+              console.log('Successfully sent message:', response);
+          })
+          .catch((error) => {
+              console.log('Error sending message:', error);
+          });
+          
+      } catch (error) {
+        console.error(error);
+      }
     }
+
+    let maskValue = sr(1)[0];
+    console.log(maskValue);
     //Adding the current user to the party.
     await sequelize.query(
-      "INSERT INTO user_party VALUES (NOW(), NOW(), :party_id, :user_id, :round, :pk1, :pk2)",
+      "INSERT INTO user_party VALUES (NOW(), NOW(), :party_id, :user_id, :count, :pk1, :pk2, pk3, maskValue)",
       {
-        replacements: { party_id, user_id, round, pk1, pk2 },
+        replacements: { party_id, user_id, pk1, pk2, pk3, count, maskValue },
         type: QueryTypes.INSERT,
       }
     );
@@ -149,6 +206,9 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
     });
   }
 });
+
+const test = BigInt("13924825392583751225793915397299222222222222222222222222253");
+console.log(test);
 
 //Called when the update of local models is complete
 router.post('/model/client/update', verifyTokenClient, async (req, res) => {
@@ -173,7 +233,6 @@ router.post('/model/client/update', verifyTokenClient, async (req, res) => {
       });
     }
    
-
     // TODO: aggregation
     
     //load stored weight
@@ -305,7 +364,6 @@ router.post('/user/fcm/newtoken', async (req, res) => {
   }
 });
 
-
 //check if user's new email is valid
 router.post('/user/account/validemail', async (req, res) => {
   const { user_email,  } = req.body;
@@ -415,7 +473,6 @@ router.post('/user/account/changepw', async (req, res) => {
     });
   }
 });
-
 
 //change password
 router.delete('/user/account/withdraw', async (req, res) => {

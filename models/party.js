@@ -18,7 +18,7 @@ module.exports = class Party extends Sequelize.Model{
             timestamps: true,
             underscored: false,
             modelName: 'Party',
-            tableName: 'paties',
+            tableName: 'parties',
             paranoid: true,
             charset: 'utf8',
             collate: 'utf8_general_ci',
