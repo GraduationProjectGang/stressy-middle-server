@@ -146,9 +146,10 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
       });
     }
     
+    //if the party has exceeded the Threshold.
+    //broadcast through FCM(Firebase Cloud Messaging) for members of the party to share key 
     if (party.size > process.env.CLIENT_THRESHOLD) {
-      //TODO: Request to FCM(firebase cloud messaging)
-
+    
       //use SELECT statements with inner join to find users who belong to Party;
       const users = await sequelize.query(
         "SELECT L.id, (SELECT tokenId AS FCM_TOKEN_ID FROM token WHERE id = L.tokenId), R.pk_n AS PK1, R.pk_nSquared AS PK2, R.pk_g AS PK3, R.maskValue from `users` AS L JOIN user_party AS R ON L.id = R.UserId WHERE R.partyId = :party_id;",
@@ -159,8 +160,9 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
       );
 
       const publicKeys = [];
-      //add fcm tokens 
+      
       let plainIndex = 0;
+      //encrypt indices
       users.forEach(user => {
         plainIndex += 1;
 
@@ -203,7 +205,7 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
       }
     }
 
-    let maskValue = sr(1)[0];
+    const maskValue = sr(1)[0];
     console.log(maskValue);
     //Add the current user to the party.
     await sequelize.query(
