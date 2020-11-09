@@ -9,7 +9,7 @@ module.exports = class Token extends Sequelize.Model{
                 autoIncrement: true,
                 allowNull: false,
             },
-            token: {
+            tokenId: {
                 type: Sequelize.STRING(200),
                 allowNull: false,
             },
@@ -26,6 +26,6 @@ module.exports = class Token extends Sequelize.Model{
     };
 
     static associate(db) {
-        db.Token.belongsTo(db.Device);
+      
     }
 };

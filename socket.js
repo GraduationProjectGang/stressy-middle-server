@@ -8,11 +8,12 @@ const crypto = require('crypto');
 dotenv.config();
 const prime = 179424673;
 const algorithm = 'aes-192-cbc';
-const saltRounds = 10;
+const saltRounds = 24;
 const iv = Buffer.alloc(16, 0); // Initialization vector.
 
 //key generation
-const key = crypto.scryptSync(env.process.AUTH_SECRET, 'salt', saltRounds);
+
+const key = crypto.scryptSync(process.env.AUTH_SECRET, 'salt', saltRounds);
 //create symmetric cipher
 const cipher = crypto.createCipheriv(algorithm, key, iv);
 

@@ -12,12 +12,13 @@ module.exports = class Party extends Sequelize.Model{
             size: {
                 type: Sequelize.INTEGER,
             },
+            
         }, {
             sequelize,
             timestamps: true,
             underscored: false,
             modelName: 'Party',
-            tableName: 'paties',
+            tableName: 'parties',
             paranoid: true,
             charset: 'utf8',
             collate: 'utf8_general_ci',
@@ -25,8 +26,8 @@ module.exports = class Party extends Sequelize.Model{
     };
 
     static associate(db) {
-        db.Party.belongsToMany(db.Device, {
-            through: 'device_party',
+        db.Party.belongsToMany(db.User, {
+            through: 'user_party',
         });
     }
 };
