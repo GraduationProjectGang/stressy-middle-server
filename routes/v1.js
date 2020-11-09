@@ -10,6 +10,7 @@ const bcrypt = require('bcrypt');
 const sr = require('secure-random');
 const math = require('mathjs');
 const { QueryTypes, Sequelize } = require('sequelize');
+const paillierBigint = require('paillier-bigint');
 
 const router = express.Router();
 
@@ -18,28 +19,6 @@ const { verifyTokenClient, verifyTokenGlobal, requestGlobalModel } = require('./
 const SALT_ROUND = 12;
 
 dotenv.config();
-
-let nm = 1000000n;
-
-let r = sr(1)[0].toString();
-console.log(r);
-let bigR = BigInt(r);
-console.log(bigR);
-let idx = 1;
-
-do {
-  let multi = BigInt(math.pow(10, idx))
-  console.log(multi);
-  bigR = bigR * multi;
-  idx = idx + 1;
-  console.log(bigR, idx, nm);
-} while (bigR >= nm);
-
-const encryptIndex = (plain, n, g, nSquared) => {
-  
-  return (g ** plain) * (r ** n) % (nSquared)
-}
-
 
 //fcm init
 var serviceAccount = require(".././serviceKey.json");
@@ -98,19 +77,41 @@ router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
   }
 });
 
-const sr_int = sr(1);
-const sr_float = sr(1);
-let sr_final = Array(1);
+//TEST CODE..
+// let nm = 1000000n;
 
-for (let i = 0; i < sr_float.length; i++) {
-  sr_float[i] = sr_float[i] * Math.pow(10, -4);
+// let r = sr(1)[0].toString();
+// console.log(r);
+// let bigR = BigInt(r);
+// console.log(bigR);
+// let idx = 1;
 
-  sr_final[i] = sr_int[i] + sr_float[i];
+// do {
+//   let multi = BigInt(math.pow(10, idx))
+//   console.log(multi);
+//   bigR = bigR * multi;
+//   idx = idx + 1;
+//   console.log(bigR, idx, nm);
+// } while (bigR >= nm);
 
-  console.log(sr_final[i]);
-}
+// const encryptIndex = (plain, n, g, nSquared) => {
+  
+//   return (g ** plain) * (r ** n) % (nSquared)
+// }
 
-console.log(sr_int);
+// const sr_int = sr(1);
+// const sr_float = sr(1);
+// let sr_final = Array(1);
+
+// for (let i = 0; i < sr_float.length; i++) {
+//   sr_float[i] = sr_float[i] * Math.pow(10, -4);
+
+//   sr_final[i] = sr_int[i] + sr_float[i];
+
+//   console.log(sr_final[i]);
+// }
+
+// console.log(sr_int);
 
 router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => {
   const { user_email, } = req.decoded;
@@ -147,45 +148,64 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
     
     if (party.size > process.env.CLIENT_THRESHOLD) {
       //TODO: Request to FCM(firebase cloud messaging)
+
+      //use SELECT statements with inner join to find users who belong to Party;
       const users = await sequelize.query(
-        "SELECT L.id, (SELECT tokenId AS fcmTokenID FROM token WHERE id = L.tokenId), R.pk_n, R.pk_nSquared, R.pk_g, R.maskalue from `users` AS L JOIN user_party AS R ON L.id = R.UserId WHERE R.partyId = 1;",
+        "SELECT L.id, (SELECT tokenId AS FCM_TOKEN_ID FROM token WHERE id = L.tokenId), R.pk_n AS PK1, R.pk_nSquared AS PK2, R.pk_g AS PK3, R.maskValue from `users` AS L JOIN user_party AS R ON L.id = R.UserId WHERE R.partyId = :party_id;",
         {
           replacements: { party_id },
           type: QueryTypes.SELECT,
         }
       );
-      tokens = [];
-      //add fcm token
+
+      const publicKeys = [];
+      //add fcm tokens 
+      let plainIndex = 0;
       users.forEach(user => {
-        toknes.add(user.fcmTokenID);
+        plainIndex += 1;
+
+        const n = BigInt(user.PK1);
+        const g = BigInt(user.PK3);
+        const publicKey = new paillierBigint.PublicKey(n, g);
+        const encryptedIndex = publicKey.encrypt(plainIndex);
+        user.encryptedIndex = encryptedIndex;
+
+        publicKeys.add({
+          n: user.PK1,
+          nSquared: user.PK2,
+          g: user.PK3,
+        });
+
       });
 
-      //TODO: generate public table and  PaillierEncryption(PK, i)
-      try {
-        const message = {
-          data: {title: 'weightRequest', body: 'weightRequest'},
-          tokens: tokens,
-          priority:"10"
-      };
-      
-      //send message
-      admin.messaging().sendMulticast(message)
-          .then((response) => {
-              // Response is a message ID string.
-              console.log('Successfully sent message:', response);
-          })
-          .catch((error) => {
-              console.log('Error sending message:', error);
-          });
-          
-      } catch (error) {
-        console.error(error);
+      //fcm 
+      for await (user of users){
+        try {
+          const message = {
+            data: {title: 'weightRequest', body: { publicKeys, index: user.encryptedIndex } },
+            token: user.FCM_TOKEN_ID,
+            priority:"10"
+        };
+        
+        //send message
+        admin.messaging().send(message)
+            .then((response) => {
+                // Response is a message ID string.
+                console.log('Successfully sent message:', response);
+            })
+            .catch((error) => {
+                console.log('Error sending message:', error);
+            });
+            
+        } catch (error) {
+          console.error(error);
+        }
       }
     }
 
     let maskValue = sr(1)[0];
     console.log(maskValue);
-    //Adding the current user to the party.
+    //Add the current user to the party.
     await sequelize.query(
       "INSERT INTO user_party VALUES (NOW(), NOW(), :party_id, :user_id, :count, :pk1, :pk2, pk3, maskValue)",
       {
@@ -207,64 +227,62 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
   }
 });
 
-const test = BigInt("13924825392583751225793915397299222222222222222222222222253");
-console.log(test);
-
-//Called when the update of local models is complete
-router.post('/model/client/update', verifyTokenClient, async (req, res) => {
-  const { user_email, model_weight, party_id } = req.body;
-  try {
-    //Locate the device through the received id value.
-    const user = await User.findOne({
-      where: {
-        email: user_email,
-      }
-    });
-    let party = await Party.findOne({
-      where: {
-        id: party_id,
-      }
-    });
+//MOVED aggreagation Server
+// //Called when aggreagate local models
+// router.post('/model/client/aggregation', verifyTokenClient, async (req, res) => {
+//   const { user_email, model_weight, party_id } = req.body;
+//   try {
+//     //Locate the device through the received id value.
+//     const user = await User.findOne({
+//       where: {
+//         email: user_email,
+//       }
+//     });
+//     let party = await Party.findOne({
+//       where: {
+//         id: party_id,
+//       }
+//     });
     
-    if (!user | !party) {
-      return res.status(304).json({
-        code: 304,
-        message: 'undefined id ',
-      });
-    }
+//     if (!user | !party) {
+//       return res.status(304).json({
+//         code: 304,
+//         message: 'undefined id ',
+//       });
+//     }
    
-    // TODO: aggregation
+//     // TODO: aggregation
     
-    //load stored weight
-    const location = `../private/weight/aggregation_${party_id}_weight`;
-    fs.writeFileSync(location, model_weight, (err, data) => {
-      if (err) {
-        console.error(error);
-        return res.status(500).json({
-          code: 500,
-          message: 'Weight Location is invalid',
-        });
-      }
-    });
-    // TODO: aggregation
-    party.size++;
-    await party.sync();
-    if (party.size == process.env.CLIENT_THRESHOLD * 2) {
-      requestGlobalModel();
-    }
+//     //load stored weight
+//     const location = `../private/weight/aggregation_${party_id}_weight`;
+//     fs.writeFileSync(location, model_weight, (err, data) => {
+//       if (err) {
+//         console.error(error);
+//         return res.status(500).json({
+//           code: 500,
+//           message: 'Weight Location is invalid',
+//         });
+//       }
+//     });
+//     // TODO: aggregation
+//     party.size++;
+//     await party.sync();
+//     if (party.size == process.env.CLIENT_THRESHOLD * 2) {
+//       requestGlobalModel();
+//     }
     
-    return res.status(201).json({
-      code: 201,
-      message: "successful uploading data",
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      code: 500,
-      message: "error message"
-    });
-  }
-});
+//     return res.status(201).json({
+//       code: 201,
+//       message: "successful uploading data",
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({
+//       code: 500,
+//       message: "error message"
+//     });
+//   }
+// });
 
 //Called when users login 
 router.post('/user/account/auth', async (req, res) => { 
