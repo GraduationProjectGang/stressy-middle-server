@@ -45,11 +45,12 @@ router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
       });
     }
     //Bring the devices that belongs to the party.
-    devices = await party.getDevices();
+    const users = await party.getUsers();
     //iteration for FCM
-    for (deivce of devices) {
-      let registrationToken = await device.getToken();
-      var message = {
+    
+    for await (user of users) {
+      const registrationToken = await user.getToken();
+      const message = {
         data: {
           //update weight for each client
           model_weight: model_weight,
