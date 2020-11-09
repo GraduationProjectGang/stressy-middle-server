@@ -75,7 +75,7 @@ module.exports = (server, app, sessionMiddleware) => {
                 console.log(encrypted);
 
                 //send encrypted token
-                io.emit('connection-success', token);
+                io.emit('connection-success', encrypted);
             } else{
                 //connection failed
                 io.emit('connection-failed', "invalid token");
