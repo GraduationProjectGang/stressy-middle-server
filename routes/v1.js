@@ -146,6 +146,23 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
         size: 0,
       });
     }
+
+    if (party.size == process.env.CLIENT_THRESHOLD) {
+      // 파티 DB접근해서 참여유저 토큰이랑 PK랑 데이터갯수, maskValue를 다읽어와야됨 - 원빈 부탁해
+      
+      // 읽어온 후, Masking Table 생성
+
+      // Index 암호화 (A*x = B) 형식으로, A를 SecureRandom으로 결정하고, 유저 인덱스 값에 맞게 B를 설정, A와 B 각각 다르게 암호화
+
+      // 데이터 개수 비율 계산 (TODO : 존나 잘해보이게 참여한 횟수까지 종합적으로 고려해서 계산하면 완벽 시간 남으면)
+
+      // 유저 FCM으로 깨우기
+
+      // 그럼 유저는 다른 경로로 되어있는 router로 저 위에 있는 데이터 다 요청하고 받으면 Masking 해서 Aggregation으로 보냄
+
+      // 새로운 Party 생성
+
+    }
     
     //if the party has exceeded the Threshold.
     //broadcast through FCM(Firebase Cloud Messaging) for members of the party to share key 
