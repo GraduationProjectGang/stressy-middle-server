@@ -206,8 +206,13 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
       }
     }
 
-    const maskValue = sr(1)[0];
-    console.log(maskValue);
+    const maskValue1 = sr(1)[0];
+    const maskValue2 = sr(1)[0] * 0.001;
+    const maskValue = maskValue1 + maskValue2;
+    console.log(maskValue1, maskValue2, maskValue);
+
+
+
     //Add the current user to the party.
     await sequelize.query(
       "INSERT INTO user_party VALUES (NOW(), NOW(), :party_id, :user_id, :count, :pk1, :pk2, pk3, maskValue)",
