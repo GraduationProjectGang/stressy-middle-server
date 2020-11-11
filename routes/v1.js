@@ -137,10 +137,11 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
         type: QueryTypes.SELECT,
       }
     );
+    const partySize = party.size;
     const party_id = party.id;
 
     //if the party does not exist or has exceeded the Threshold.
-    if (!party | party.size > process.env.CLIENT_THRESHOLD) {
+    if (!party | partySize > process.env.CLIENT_THRESHOLD) {
       //create new party
       party = await Party.create({
         size: 0,
@@ -166,11 +167,11 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
     
     //if the party has exceeded the Threshold.
     //broadcast through FCM(Firebase Cloud Messaging) for members of the party to share key 
-    if (party.size > process.env.CLIENT_THRESHOLD) {
+    if (partySize > process.env.CLIENT_THRESHOLD) {
     
       //use SELECT statements with inner join to find users who belong to Party;
       const users = await sequelize.query(
-        "SELECT L.id, (SELECT tokenId AS FCM_TOKEN_ID FROM token WHERE id = L.tokenId), R.pk_n AS PK1, R.pk_nSquared AS PK2, R.pk_g AS PK3, R.maskValue from `users` AS L JOIN user_party AS R ON L.id = R.UserId WHERE R.partyId = :party_id;",
+        "SELECT L.id, (SELECT tokenId AS FCM_TOKEN_ID FROM token WHERE id = L.tokenId), R.dataCount as size, R.pk_n AS PK1, R.pk_nSquared AS PK2, R.pk_g AS PK3, R.maskValue from `users` AS L JOIN user_party AS R ON L.id = R.UserId WHERE R.partyId = :party_id;",
         {
           replacements: { party_id },
           type: QueryTypes.SELECT,
@@ -178,31 +179,56 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
       );
 
       const publicKeys = [];
-      
+      const maskValues = [];
+
       let plainIndex = 0;
+      let size = 0;
       //encrypt indices
       users.forEach(user => {
+
         plainIndex += 1;
+        size += user.size;
 
         const n = BigInt(user.PK1);
         const g = BigInt(user.PK3);
         const publicKey = new paillierBigint.PublicKey(n, g);
-        const encryptedIndex = publicKey.encrypt(plainIndex);
-        user.encryptedIndex = encryptedIndex;
+        
+        //"Ax = B" plaintext를 암호화 하기에는 스키마를 바꿔야 해서 아래와 같이 변경.
+        //example
+        //A = 10007, B = 10007 * 3(index)
+        //encryptedIndex = encrytp(A) + " " + encrypt(B)
+        const A = sr(1)[0];
+        const B = A * plainIndex;
+        const encryptedIndexA = publicKey.encrypt(A);
+        const encryptedIndexB = publicKey.encrypt(B);
+        user.encryptedIndex = encryptedIndexA + " " + encryptedIndexB;
+        
 
         publicKeys.add({
           n: user.PK1,
           nSquared: user.PK2,
           g: user.PK3,
         });
+        maskValues.add(user.maskValue);
 
       });
-
+      
+      //TODO: 마스킹 테이블 작성
+      maskTable = [];
+      maskValues.forEach(value => {
+        
+      });
+      
+      //저장해야 하는가?
+      const sizePadding = sr(1)[0] % 10007;
       //fcm 
       for await (user of users){
+        
+        user.ratio = user.size / size * sizePadding;
+
         try {
           const message = {
-            data: {title: 'weightRequest', body: { publicKeys, index: user.encryptedIndex } },
+            data: {title: 'weightRequest', body: { maskTable, maskValues ,index: user.encryptedIndex, ratio: user.ratio } },
             token: user.FCM_TOKEN_ID,
             priority:"10"
         };
@@ -223,10 +249,10 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
       }
     }
 
-    const maskValue1 = sr(1)[0];
-    const maskValue2 = sr(1)[0] * 0.001;
-    const maskValue = maskValue1 + maskValue2;
-    console.log(maskValue1, maskValue2, maskValue);
+    // const maskValue1 = sr(1)[0];
+    // const maskValue2 = sr(1)[0] * 0.001;
+    // const maskValue = maskValue1 + maskValue2;
+    // console.log(maskValue1, maskValue2, maskValue);
 
 
 
