@@ -7,7 +7,8 @@ exports.requestGlobalModel = (req, res, next) => {
 
 exports.verifyTokenClient = (req, res, next) => { //내가 발급한 jwt 토큰이 맞는지
   try {
-    console.log(req.headers.authorization, req.body);
+    console.log(req.headers.authorization);
+    console.log(req.body);
     req.decoded = jwt.verify(req.headers.authorization, process.env.JWT_SECRET);
     console.log(req.decoded);
     return next();

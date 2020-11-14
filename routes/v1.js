@@ -29,65 +29,16 @@ admin.initializeApp({
   databaseURL: "https://datacollect-18877.firebaseio.com"
 });
 
-const CLIENT_THRESHOLD = 2;
+const CLIENT_THRESHOLD = 3;
 
+let isPartyExists = false;
+let current_party_size = 0;
+let current_party_id = 0;
 
-router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
-  const { model_weight, party_id } = req.body;
-  try {
-    //find party
-    const party = await Party.findOne({
-      where: {
-        id: party_id,
-      },
-    });
+router.post('/model/client/acknowledge', async (req, res) => {
 
-    if (!party) {
-      return res.status(304).json({
-        code: 304,
-        message: `cannot find party id:${party_id}`
-      });
-    }
-    //Bring the devices that belongs to the party.
-    const users = await party.getUsers();
-    //iteration for FCM
-    
-    for await (user of users) {
-      const registrationToken = await user.getToken();
-      const message = {
-        data: {
-          //update weight for each client
-          model_weight: model_weight,
-          party_id: party_id,
-        },
-        registration_ids: registrationToken
-      };
-      //promise method for sending messages
-      admin.messaging().send(message)
-        .then((response) => {
-          // Response is a message ID string.
-          console.log('Successfully sent message:', response);
-        })
-        .catch((error) => {
-          console.log('Error sending message:', error);
-        });
-    }
-
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      code: 500,
-      message: 'update failed',
-    });
-  }
-});
-
-
-router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => {
-  const { user_email, } = req.decoded;
-  const { count, pk1, pk2, pk3 } = req.body;
-
-  console.log(user_email, count, pk1, pk2, pk3);
+  const { user_email, count, pk_n, pk_nSquared, pk_g } = req.body;
+  // console.log(user_email, count, pk_n, pk_nSquared, pk_g);
 
   try {
     //find User
@@ -96,6 +47,9 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
         email: user_email,
       }
     });
+
+    console.log(user);
+
     //if email is invalid
     if (!user) {
       return res.status(304).json({
@@ -103,26 +57,71 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
         message: 'user not found',
       });
     }
+
     let party = await sequelize.query(
       "SELECT * FROM parties where deletedAt is not null ORDER BY id desc limit 1",
       {
         type: QueryTypes.SELECT,
       }
     );
-    const partySize = party.size;
-    const party_id = party.id;
+
+    console.log(party);
 
     //if the party does not exist or has exceeded the Threshold.
-    if (!party | partySize > CLIENT_THRESHOLD) {
+    if (!isPartyExists) {
+      console.log("no party");
+      isPartyExists = true;
       //create new party
       party = await Party.create({
         size: 0,
+      }).then((party) => {
+        current_party_id = party.id;
       });
     }
-    
+    else {
+      party = await sequelize.query(
+        `SELECT * FROM parties where id = ${current_party_id} desc limit 1`,
+        {
+          type: QueryTypes.SELECT,
+        }
+      )
+    }
+
+    console.log(party);
+
+    const partySize = party.size;
+    const party_id = party.id;
+
+    console.log(partySize, party_id);
+
+    const maskValue = 0;
+    const user_id = user.id;
+    console.log(user_id);
+
+    //Add the current user to the party.
+    await sequelize.query(
+      "INSERT INTO user_party VALUES (NOW(), NOW(), :party_id, :user_id, :count, :pk_n, :pk_nSquared, :pk_g, :maskValue)",
+      {
+        replacements: { party_id, user_id, count, pk_n, pk_nSquared, pk_g, maskValue },
+        type: QueryTypes.INSERT,
+      }
+    );
+
+    const curSize = party.size;
+    party.size = curSize + 1;
+
+    current_party_size += 1;
+
+    console.log(party.size);
+
+    await party.sequelize.sync();
+
     //if the party has exceeded the Threshold.
     //broadcast through FCM(Firebase Cloud Messaging) for members of the party to share key 
-    if (partySize === CLIENT_THRESHOLD) {
+    if (current_party_size === CLIENT_THRESHOLD) {
+
+      isPartyExists = false;
+      current_party_size = 0;
     
       //use SELECT statements with inner join to find users who belong to Party;
       const users = await sequelize.query(
@@ -133,7 +132,7 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
         }
       );
 
-      const publicKeys = [];
+      let publicKeys = [];
 
       let plainIndex = 0;
       let total_size = 0;
@@ -156,8 +155,12 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
         const encryptedIndexA = publicKey.encrypt(A);
         const encryptedIndexB = publicKey.encrypt(B);
         user.encryptedIndex = encryptedIndexA + " " + encryptedIndexB;
+
+        console.log(plainIndex);
+        console.log(encryptedIndexA);
+        console.log(encryptedIndexB);
         
-        publicKeys.add({
+        publicKeys.push({
           n: user.PK1,
           nSquared: user.PK2,
           g: user.PK3,
@@ -166,19 +169,6 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
       });
       
       // 마스킹 테이블 작성
-      // let maskTable = Array(
-      //   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      //   [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-      //   [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-      //   [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-      //   [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-      //   [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-      //   [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-      //   [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-      //   [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-      //   [0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-      // );
-
       let maskTable = math.identity(CLIENT_THRESHOLD);
 
       for (let i = 0; i < CLIENT_THRESHOLD; i++) {
@@ -204,7 +194,7 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
 
         try {
           const message = {
-            data: {title: 'weightRequest', body: { party_id, maskTable, index: user.encryptedIndex, ratio: user.ratio } },
+            data: {title: 'weightRequest', body: { party_id: party_id, maskTable: maskTable, index: user.encryptedIndex, ratio: user.ratio } },
             token: user.FCM_TOKEN_ID,
             priority:"10"
         };
@@ -225,31 +215,19 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
       }
     }
 
-    // const maskValue1 = sr(1)[0];
-    // const maskValue2 = sr(1)[0] * 0.001;
-    // const maskValue = maskValue1 + maskValue2;
-    // console.log(maskValue1, maskValue2, maskValue);
-
-    //Add the current user to the party.
-    await sequelize.query(
-      "INSERT INTO user_party VALUES (NOW(), NOW(), :party_id, :user_id, :count, :pk1, :pk2, pk3, maskValue)",
-      {
-        replacements: { party_id, user_id, pk1, pk2, pk3, count, maskValue },
-        type: QueryTypes.INSERT,
-      }
-    );
-    party.size++;
-    await party.sync();
     return res.status(201).json({
       code: 201,
       message: "accept acknowledge",
+
     });
   } catch (error) {
+    console.log(error);
     return res.status(500).json({
       code: 500,
       message: "failed acknowledge"
     });
   }
+
 });
 
 //Called when users login 
@@ -281,10 +259,10 @@ router.post('/user/account/auth', async (req, res) => {
             issuer: 'stressy-middle',
           });
           //
-          console.log("user----------",user)
+          // console.log("user----------",user)
           const payload = JSON.parse(JSON.stringify(user));
           payload.pw = "";
-          console.log(signedJWT)
+          // console.log(signedJWT)
           return res.json({
             code: 200,
             payload,
