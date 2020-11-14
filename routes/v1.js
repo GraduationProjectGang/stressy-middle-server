@@ -11,6 +11,7 @@ const sr = require('secure-random');
 const math = require('mathjs');
 const { QueryTypes, Sequelize } = require('sequelize');
 const paillierBigint = require('paillier-bigint');
+// const math = require('mathjs');
 
 const router = express.Router();
 
@@ -27,6 +28,9 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   databaseURL: "https://datacollect-18877.firebaseio.com"
 });
+
+const CLIENT_THRESHOLD = 2;
+
 
 router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
   const { model_weight, party_id } = req.body;
@@ -78,45 +82,13 @@ router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
   }
 });
 
-//TEST CODE..
-// let nm = 1000000n;
-
-// let r = sr(1)[0].toString();
-// console.log(r);
-// let bigR = BigInt(r);
-// console.log(bigR);
-// let idx = 1;
-
-// do {
-//   let multi = BigInt(math.pow(10, idx))
-//   console.log(multi);
-//   bigR = bigR * multi;
-//   idx = idx + 1;
-//   console.log(bigR, idx, nm);
-// } while (bigR >= nm);
-
-// const encryptIndex = (plain, n, g, nSquared) => {
-  
-//   return (g ** plain) * (r ** n) % (nSquared)
-// }
-
-// const sr_int = sr(1);
-// const sr_float = sr(1);
-// let sr_final = Array(1);
-
-// for (let i = 0; i < sr_float.length; i++) {
-//   sr_float[i] = sr_float[i] * Math.pow(10, -4);
-
-//   sr_final[i] = sr_int[i] + sr_float[i];
-
-//   console.log(sr_final[i]);
-// }
-
-// console.log(sr_int);
 
 router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => {
   const { user_email, } = req.decoded;
-  const { count ,pk1, pk2, pk3 } = req.body;
+  const { count, pk1, pk2, pk3 } = req.body;
+
+  console.log(user_email, count, pk1, pk2, pk3);
+
   try {
     //find User
     const user = await User.findOne({
@@ -141,33 +113,16 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
     const party_id = party.id;
 
     //if the party does not exist or has exceeded the Threshold.
-    if (!party | partySize > process.env.CLIENT_THRESHOLD) {
+    if (!party | partySize > CLIENT_THRESHOLD) {
       //create new party
       party = await Party.create({
         size: 0,
       });
     }
-
-    if (party.size == process.env.CLIENT_THRESHOLD) {
-      // 파티 DB접근해서 참여유저 토큰이랑 PK랑 데이터갯수, maskValue를 다읽어와야됨 - 원빈 부탁해
-      
-      // 읽어온 후, Masking Table 생성
-
-      // Index 암호화 (A*x = B) 형식으로, A를 SecureRandom으로 결정하고, 유저 인덱스 값에 맞게 B를 설정, A와 B 각각 다르게 암호화
-
-      // 데이터 개수 비율 계산 (TODO : 존나 잘해보이게 참여한 횟수까지 종합적으로 고려해서 계산하면 완벽 시간 남으면)
-
-      // 유저 FCM으로 깨우기
-
-      // 그럼 유저는 다른 경로로 되어있는 router로 저 위에 있는 데이터 다 요청하고 받으면 Masking 해서 Aggregation으로 보냄
-
-      // 새로운 Party 생성
-
-    }
     
     //if the party has exceeded the Threshold.
     //broadcast through FCM(Firebase Cloud Messaging) for members of the party to share key 
-    if (partySize > process.env.CLIENT_THRESHOLD) {
+    if (partySize === CLIENT_THRESHOLD) {
     
       //use SELECT statements with inner join to find users who belong to Party;
       const users = await sequelize.query(
@@ -179,15 +134,14 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
       );
 
       const publicKeys = [];
-      const maskValues = [];
 
       let plainIndex = 0;
-      let size = 0;
+      let total_size = 0;
       //encrypt indices
       users.forEach(user => {
 
         plainIndex += 1;
-        size += user.size;
+        total_size += user.size;
 
         const n = BigInt(user.PK1);
         const g = BigInt(user.PK3);
@@ -203,32 +157,54 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
         const encryptedIndexB = publicKey.encrypt(B);
         user.encryptedIndex = encryptedIndexA + " " + encryptedIndexB;
         
-
         publicKeys.add({
           n: user.PK1,
           nSquared: user.PK2,
           g: user.PK3,
         });
-        maskValues.add(user.maskValue);
 
       });
       
-      //TODO: 마스킹 테이블 작성
-      maskTable = [];
-      maskValues.forEach(value => {
-        
-      });
+      // 마스킹 테이블 작성
+      // let maskTable = Array(
+      //   [1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      //   [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+      //   [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+      //   [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+      //   [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+      //   [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+      //   [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      //   [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+      //   [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+      //   [0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+      // );
+
+      let maskTable = math.identity(CLIENT_THRESHOLD);
+
+      for (let i = 0; i < CLIENT_THRESHOLD; i++) {
+        for (let j = i + 1; j < CLIENT_THRESHOLD; j++) {
+          maskTable.subset(math.index(i, j), (sr(1)[0] + sr(1)[0] * 0.001));
+        }
+      }
+
+      for (let i = 0; i < CLIENT_THRESHOLD; i++) {
+        for (let j = 0; j < i; j++) {
+          maskTable.subset(math.index(i, j), math.subset(maskTable, math.index(j, i)));
+        }
+      }
+
+      console.log(maskTable);
       
-      //저장해야 하는가?
+      //저장해야 하는가? ㅇㅇ
       const sizePadding = sr(1)[0] % 10007;
       //fcm 
       for await (user of users){
         
-        user.ratio = user.size / size * sizePadding;
+        user.ratio = user.size / total_size;
 
         try {
           const message = {
-            data: {title: 'weightRequest', body: { maskTable, maskValues ,index: user.encryptedIndex, ratio: user.ratio } },
+            data: {title: 'weightRequest', body: { party_id, maskTable, index: user.encryptedIndex, ratio: user.ratio } },
             token: user.FCM_TOKEN_ID,
             priority:"10"
         };
@@ -254,8 +230,6 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
     // const maskValue = maskValue1 + maskValue2;
     // console.log(maskValue1, maskValue2, maskValue);
 
-
-
     //Add the current user to the party.
     await sequelize.query(
       "INSERT INTO user_party VALUES (NOW(), NOW(), :party_id, :user_id, :count, :pk1, :pk2, pk3, maskValue)",
@@ -278,69 +252,12 @@ router.post('/model/client/acknowledge', verifyTokenClient, async (req, res) => 
   }
 });
 
-//MOVED aggreagation Server
-// //Called when aggreagate local models
-// router.post('/model/client/aggregation', verifyTokenClient, async (req, res) => {
-//   const { user_email, model_weight, party_id } = req.body;
-//   try {
-//     //Locate the device through the received id value.
-//     const user = await User.findOne({
-//       where: {
-//         email: user_email,
-//       }
-//     });
-//     let party = await Party.findOne({
-//       where: {
-//         id: party_id,
-//       }
-//     });
-    
-//     if (!user | !party) {
-//       return res.status(304).json({
-//         code: 304,
-//         message: 'undefined id ',
-//       });
-//     }
-   
-//     // TODO: aggregation
-    
-//     //load stored weight
-//     const location = `../private/weight/aggregation_${party_id}_weight`;
-//     fs.writeFileSync(location, model_weight, (err, data) => {
-//       if (err) {
-//         console.error(error);
-//         return res.status(500).json({
-//           code: 500,
-//           message: 'Weight Location is invalid',
-//         });
-//       }
-//     });
-//     // TODO: aggregation
-//     party.size++;
-//     await party.sync();
-//     if (party.size == process.env.CLIENT_THRESHOLD * 2) {
-//       requestGlobalModel();
-//     }
-    
-//     return res.status(201).json({
-//       code: 201,
-//       message: "successful uploading data",
-//     });
-//   } catch (error) {
-//     console.error(error);
-//     return res.status(500).json({
-//       code: 500,
-//       message: "error message"
-//     });
-//   }
-// });
-
 //Called when users login 
 router.post('/user/account/auth', async (req, res) => { 
     const { user_email, user_pw } = req.body;
+    // console.log(user_email, user_pw);
     try {
       const hash = await bcrypt.hash(user_pw, SALT_ROUND);
-      console.log("hashed value",hash)
       const user = await User.findOne({
         where: { 
           email: user_email,
@@ -354,7 +271,7 @@ router.post('/user/account/auth', async (req, res) => {
         });
       }
       
-      bcrypt.compare(user_pw,user.pw,function(err,result){
+      bcrypt.compare(user_pw, user.pw, function(err,result){
         if(result){
           const signedJWT = jwt.sign({
             id: user.id,
@@ -376,13 +293,13 @@ router.post('/user/account/auth', async (req, res) => {
             expiresIn: 30000,//30000분
           });
         }else{
+          console.log(err);
           return res.status(501).json({
             code: 501,
             message: 'wrong password',
           });
         }
       });
-      
     } catch (error) {
       console.error(error);
       return res.status(500).json({
@@ -466,6 +383,7 @@ router.post('/user/account/validemail', async (req, res) => {
   }
 });
 
+
 router.post('/user/account/signup', async (req, res) => {
   const { user_email, user_pw, user_name, user_gender, user_bd, user_token,  } = req.body;
   try {
@@ -544,7 +462,7 @@ router.post('/user/account/changepw', async (req, res) => {
 });
 
 //change password
-router.delete('/user/account/withdraw', async (req, res) => {
+router.post('/user/account/withdraw', async (req, res) => {
   //delete user from User
   const { user_email, fcm_token } = req.body;
   try {

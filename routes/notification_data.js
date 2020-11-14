@@ -13,8 +13,7 @@ const { Device, Party, Token, User, sequelize } = require('../models');
 
 // exports.scheduleEnqueuing = async () =>{
 
-
-exports.scheduleEnqueuing = async () =>{
+exports.scheduleEnqueuing = async () => {
     const tokens = await Token.findAll();
     console.log(tokens);
     let registrationTokens = [];

@@ -12,6 +12,9 @@ module.exports = class Party extends Sequelize.Model{
             size: {
                 type: Sequelize.INTEGER,
             },
+            mulMask: {
+                type: Sequelize.INTEGER,
+            }
             
         }, {
             sequelize,
