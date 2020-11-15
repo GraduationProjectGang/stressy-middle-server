@@ -15,7 +15,7 @@ const paillierBigint = require('paillier-bigint');
 
 const router = express.Router();
 
-const { Device, Party, Token, User, sequelize } = require('../models');
+const { Party, Token, User, sequelize } = require('../models');
 const { verifyTokenClient, verifyTokenGlobal, requestGlobalModel } = require('./middleware');
 const SALT_ROUND = 12;
 
@@ -30,10 +30,6 @@ admin.initializeApp({
 });
 
 const CLIENT_THRESHOLD = 3;
-
-let isPartyExists = false;
-let current_party_size = 0;
-let current_party_id = 0;
 
 router.post('/model/client/acknowledge', async (req, res) => {
 
@@ -59,7 +55,7 @@ router.post('/model/client/acknowledge', async (req, res) => {
     }
 
     let party = await sequelize.query(
-      "SELECT * FROM parties where deletedAt is not null ORDER BY id desc limit 1",
+      "SELECT * FROM parties where deletedAt is null ORDER BY id desc limit 1",
       {
         type: QueryTypes.SELECT,
       }
@@ -67,36 +63,29 @@ router.post('/model/client/acknowledge', async (req, res) => {
 
     console.log(party);
 
-    //if the party does not exist or has exceeded the Threshold.
-    if (!isPartyExists) {
+    let partySize = 0;
+    let party_id = 0;
+
+    //if the party does not exist
+    if (party.length === 0) {
       console.log("no party");
-      isPartyExists = true;
       //create new party
       party = await Party.create({
         size: 0,
-      }).then((party) => {
-        current_party_id = party.id;
       });
+
+      party_id = party.id;
     }
     else {
-      party = await sequelize.query(
-        `SELECT * FROM parties where id = ${current_party_id} desc limit 1`,
-        {
-          type: QueryTypes.SELECT,
-        }
-      )
+      let party_first = party.pop();
+
+      partySize = party_first.size;
+      party_id = party_first.id;
+
+      console.log(partySize, party_id);
     }
-
-    console.log(party);
-
-    const partySize = party.size;
-    const party_id = party.id;
-
-    console.log(partySize, party_id);
-
     const maskValue = 0;
     const user_id = user.id;
-    console.log(user_id);
 
     //Add the current user to the party.
     await sequelize.query(
@@ -107,67 +96,31 @@ router.post('/model/client/acknowledge', async (req, res) => {
       }
     );
 
-    const curSize = party.size;
-    party.size = curSize + 1;
+    await sequelize.query(
+      `UPDATE parties set size = ${partySize + 1} WHERE id = :party_id`,
+      {
+        replacements: { party_id },
+        type: QueryTypes.UPDATE,
+      }
+    );
 
-    current_party_size += 1;
-
-    console.log(party.size);
-
-    await party.sequelize.sync();
+    partySize += 1;
 
     //if the party has exceeded the Threshold.
-    //broadcast through FCM(Firebase Cloud Messaging) for members of the party to share key 
-    if (current_party_size === CLIENT_THRESHOLD) {
+    //broadcast through FCM(Firebase Cloud Messaging) for members of the party to share key
 
-      isPartyExists = false;
-      current_party_size = 0;
-    
+    // TODO set parties.DeletedAt NULL
+    if (partySize === CLIENT_THRESHOLD) {
+
       //use SELECT statements with inner join to find users who belong to Party;
       const users = await sequelize.query(
-        "SELECT L.id, (SELECT tokenId AS FCM_TOKEN_ID FROM token WHERE id = L.tokenId), R.dataCount as size, R.pk_n AS PK1, R.pk_nSquared AS PK2, R.pk_g AS PK3, R.maskValue from `users` AS L JOIN user_party AS R ON L.id = R.UserId WHERE R.partyId = :party_id;",
+        "SELECT L.id, (SELECT tokenId FROM token WHERE id = L.tokenId) as tokenValue, R.dataCount as size, R.pk_n AS PK1, R.pk_nSquared AS PK2, R.pk_g AS PK3, R.maskValue from `users` AS L JOIN user_party AS R ON L.id = R.UserId WHERE R.partyId = :party_id;",
         {
           replacements: { party_id },
           type: QueryTypes.SELECT,
         }
       );
 
-      let publicKeys = [];
-
-      let plainIndex = 0;
-      let total_size = 0;
-      //encrypt indices
-      users.forEach(user => {
-
-        plainIndex += 1;
-        total_size += user.size;
-
-        const n = BigInt(user.PK1);
-        const g = BigInt(user.PK3);
-        const publicKey = new paillierBigint.PublicKey(n, g);
-        
-        //"Ax = B" plaintext를 암호화 하기에는 스키마를 바꿔야 해서 아래와 같이 변경.
-        //example
-        //A = 10007, B = 10007 * 3(index)
-        //encryptedIndex = encrytp(A) + " " + encrypt(B)
-        const A = sr(1)[0];
-        const B = A * plainIndex;
-        const encryptedIndexA = publicKey.encrypt(A);
-        const encryptedIndexB = publicKey.encrypt(B);
-        user.encryptedIndex = encryptedIndexA + " " + encryptedIndexB;
-
-        console.log(plainIndex);
-        console.log(encryptedIndexA);
-        console.log(encryptedIndexB);
-        
-        publicKeys.push({
-          n: user.PK1,
-          nSquared: user.PK2,
-          g: user.PK3,
-        });
-
-      });
-      
       // 마스킹 테이블 작성
       let maskTable = math.identity(CLIENT_THRESHOLD);
 
@@ -182,37 +135,76 @@ router.post('/model/client/acknowledge', async (req, res) => {
           maskTable.subset(math.index(i, j), math.subset(maskTable, math.index(j, i)));
         }
       }
-
       console.log(maskTable);
-      
+
       //저장해야 하는가? ㅇㅇ
       const sizePadding = sr(1)[0] % 10007;
-      //fcm 
-      for await (user of users){
+
+      let publicKeys = [];
+
+      let plainIndex = 1;
+      let total_size = 0;
+      //encrypt indices
+      users.forEach((user) => {
+
+        console.log(user);
+
+        plainIndex += 1;
+        total_size += user.size;
+
+        const n = BigInt(user.PK1);
+        const g = BigInt(user.PK3);
+        const publicKey = new paillierBigint.PublicKey(n, g);
         
-        user.ratio = user.size / total_size;
+        const A = sr(1)[0];
+        const B = A * plainIndex;
+        const encryptedIndexA = publicKey.encrypt(A);
+        const encryptedIndexB = publicKey.encrypt(B);
+        user.encryptedIndex = encryptedIndexA + " " + encryptedIndexB;
+
+        // console.log(plainIndex);
+        // console.log(encryptedIndexA);
+        // console.log(encryptedIndexB);
+        
+        publicKeys.push({
+          n: user.PK1,
+          nSquared: user.PK2,
+          g: user.PK3,
+        });
+
+        let ratio = user.size / total_size;
+        // console.log(user.tokenValue);
+
+        let temptks = [];
+        temptks.push(user.tokenValue);
 
         try {
-          const message = {
-            data: {title: 'weightRequest', body: { party_id: party_id, maskTable: maskTable, index: user.encryptedIndex, ratio: user.ratio } },
-            token: user.FCM_TOKEN_ID,
-            priority:"10"
-        };
-        
-        //send message
-        admin.messaging().send(message)
-            .then((response) => {
-                // Response is a message ID string.
-                console.log('Successfully sent message:', response);
-            })
-            .catch((error) => {
-                console.log('Error sending message:', error);
-            });
-            
-        } catch (error) {
-          console.error(error);
-        }
-      }
+          const jsonStr = JSON.stringify({ "maskTable": maskTable.toString(), "index": user.encryptedIndex, "ratio": ratio.toString() });
+          console.log(jsonStr);
+          const msg = {
+            data: {title: 'weightRequest', body: jsonStr },
+            tokens: temptks,
+            priority: '10',
+          };
+
+          // console.log(msg.data);
+
+          //send message
+          admin.messaging().sendMulticast(msg)
+              .then((response) => {
+                  // Response is a message ID string.
+                  console.log(`to ${user.id}, Successfully sent message:`, response);
+              })
+              .catch((error) => {
+                  console.log(`to ${user.id}, Error sending message:`, error);
+              });
+              
+          } catch (error) {
+            console.log(error);
+          }
+
+      });
+      
     }
 
     return res.status(201).json({
