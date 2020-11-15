@@ -122,7 +122,7 @@ router.post('/model/client/acknowledge', async (req, res) => {
         }
       );
       
-      await Party.delete({
+      await Party.destroy({
         where: { id: party_id }
       });
 
