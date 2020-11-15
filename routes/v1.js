@@ -96,6 +96,7 @@ router.post('/model/client/acknowledge', async (req, res) => {
       }
     );
 
+    
     await sequelize.query(
       `UPDATE parties set size = ${partySize + 1} WHERE id = :party_id`,
       {
@@ -103,7 +104,7 @@ router.post('/model/client/acknowledge', async (req, res) => {
         type: QueryTypes.UPDATE,
       }
     );
-
+    
     partySize += 1;
 
     //if the party has exceeded the Threshold.
@@ -120,6 +121,10 @@ router.post('/model/client/acknowledge', async (req, res) => {
           type: QueryTypes.SELECT,
         }
       );
+      
+      await Party.delete({
+        where: { id: party_id }
+      });
 
       // 마스킹 테이블 작성
       let maskTable = math.identity(CLIENT_THRESHOLD);
@@ -207,6 +212,7 @@ router.post('/model/client/acknowledge', async (req, res) => {
       
     }
 
+    
     return res.status(201).json({
       code: 201,
       message: "accept acknowledge",
