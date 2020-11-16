@@ -10,6 +10,9 @@ const { Device, Party, Token, User, sequelize } = require('../models');
 //   credential: admin.credential.cert(serviceAccount),
 //   databaseURL: "https://datacollect-18877.firebaseio.com"
 // });
+require('log-timestamp');
+
+const LogStr = "세지원 :";
 
 // exports.scheduleEnqueuing = async () =>{
 
@@ -27,7 +30,7 @@ exports.scheduleEnqueuing = async () => {
         if(tokens.length == 0) return;
         cron.schedule('*/15 * * * *', () => {
             require('log-timestamp');
-            console.log('매 15분 마다 실행');
+            console.log(LogStr, '매 15분 마다 FCM을 통하여 클라이언트 앱의 DataCollectWorker 호출');
             const message = {
                 data: {title: 'dataCollect', body: 'dataCollect'},
                 tokens: registrationTokens,
@@ -53,7 +56,7 @@ exports.scheduleEnqueuing = async () => {
         if(tokens.length == 0) return;
         cron.schedule('0 3 * * *', () => {
             require('log-timestamp');
-            console.log('매일 오전 3시 마다 실행');
+            console.log(logStr, '매일 오전 3시마다 FCM을 통하여 클라이언트 앱의 TrainingWorker 호출');
             const message = {
                 data: {title: 'startTraining', body: 'startTraining'},
                 tokens: registrationTokens,

@@ -6,6 +6,7 @@ const morgan = require('morgan');
 const session = require('express-session');
 const nunjucks = require('nunjucks');
 const dotenv = require('dotenv');
+require('log-timestamp');
 
 dotenv.config();
 const indexRouter = require('./routes');
@@ -14,6 +15,7 @@ const webSocket = require('./socket');
 const { sequelize } = require('./models');
 const { scheduleEnqueuing } = require('./routes/notification_data');
 
+const LogStr = "세지원 :";
 
 const app = express();
 
@@ -25,7 +27,7 @@ nunjucks.configure('views', {
 });
 sequelize.sync({ force: false })
   .then(() => {
-    console.log('데이터베이스 연결 성공');
+    console.log(LogStr, '3306 번 포트, MySQL 연결 성공');
   })
   .catch((err) => {
     console.error(err);
@@ -67,7 +69,7 @@ app.use((err, req, res, next) => {
 scheduleEnqueuing();
 
 const server = app.listen(app.get('port'), () => {
-  console.log(app.get('port'), '번 포트에서 대기중');
+  console.log(LogStr, app.get('port'), '번 포트에서 대기중');
 });
 
 webSocket(server, app, sessionMiddleware);

@@ -14,10 +14,13 @@ const { QueryTypes, Sequelize } = require('sequelize');
 const paillierBigint = require('paillier-bigint');
 const bcu = require('bigint-crypto-utils');
 const randomInt = require('random-int');
+require('log-timestamp');
 
 // const math = require('mathjs');
 
 const router = express.Router();
+
+const logStr = "세지원 :";
 
 const { Party, Token, User, sequelize } = require('../models');
 const { verifyTokenClient, verifyTokenGlobal, requestGlobalModel } = require('./middleware');
@@ -124,7 +127,7 @@ router.post('/model/client/acknowledge', async (req, res) => {
 
     //if the party does not exist
     if (party.length === 0) {
-      console.log("no party");
+      console.log(logStr, "현재 인원이 남아있는 Party가 없으므로 새로운 Party 생성");
       //create new party
       party = await Party.create({
         size: 0,
@@ -137,8 +140,8 @@ router.post('/model/client/acknowledge', async (req, res) => {
 
       partySize = party_first.size;
       partyID = party_first.id;
-
-      console.log(partySize, partyID);
+      console.log(logStr, "Selected Party ID:", partyID);
+      console.log(logStr, "Selected Party Size:", partyID);
     }
     const sizePadding = sr(1) * 0.1;
     const userID = user.id;
@@ -152,7 +155,9 @@ router.post('/model/client/acknowledge', async (req, res) => {
       }
     );
 
-    
+    console.log(logStr, `Party에 현재 user ${userID} 추가`);
+    console.log(logStr, `user ${userID}'s Public Key(n) = ${pk_n}`);
+
     await sequelize.query(
       `UPDATE parties set size = ${partySize + 1} WHERE id = :partyID`,
       {
@@ -169,7 +174,7 @@ router.post('/model/client/acknowledge', async (req, res) => {
     // TODO set parties.DeletedAt NULL
     if (partySize === CLIENT_THRESHOLD) {
 
-      // axios.post('localhost:49953/v1/send/')
+      console.log(logStr, "Party size has exceeded the Threshold:", CLIENT_THRESHOLD);
 
       //use SELECT statements with inner join to find users who belong to Party;
       const users = await sequelize.query(
@@ -183,6 +188,8 @@ router.post('/model/client/acknowledge', async (req, res) => {
       await Party.destroy({
         where: { id: partyID }
       });
+
+      console.log(logStr, "Destroy current party:", partyID);
 
       // 마스킹 테이블 작성
       let maskTable = math.identity(CLIENT_THRESHOLD);
@@ -198,7 +205,7 @@ router.post('/model/client/acknowledge', async (req, res) => {
           maskTable.subset(math.index(i, j), math.subset(maskTable, math.index(j, i)));
         }
       }
-      console.log(maskTable);
+      console.log(logStr, "Masking Table 생성 :", maskTable);
 
       //저장해야 하는가? ㅇㅇ
 
@@ -214,6 +221,7 @@ router.post('/model/client/acknowledge', async (req, res) => {
       .catch((err) => {
         console.error(err);
       });
+
       users.forEach((user) => {
 
         console.log(user);
@@ -236,6 +244,10 @@ router.post('/model/client/acknowledge', async (req, res) => {
         const encryptedIndexC = publicKey.encrypt(BigInt(C));
 
         user.encryptedIndex = encryptedIndexA + "," + encryptedIndexB + "," + encryptedIndexC;
+
+        console.log(logStr, "Make A*x + B = C");
+        console.log(logStr, `user ${user.id}'s A = ${A}, B = ${A}, C = ${A}`);
+        console.log(logStr, `user ${user.id}'s encrypted A = ${encryptedIndexA}`);
 
         publicKeys.push({
           n: user.PK1,
@@ -263,7 +275,7 @@ router.post('/model/client/acknowledge', async (req, res) => {
           admin.messaging().sendMulticast(msg)
               .then((response) => {
                   // Response is a message ID string.
-                  console.log(`to ${user.id}, Successfully sent message:`, response);
+                  console.log(logStr, `${user.id}에게 Aggregation Server에 Weight를 보내라고 지시:`, response);
               })
               .catch((error) => {
                   console.log(`to ${user.id}, Error sending message:`, error);
