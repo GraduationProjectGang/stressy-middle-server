@@ -3,6 +3,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const axios = require('axios');
 const url = require('url');
 const fs = require('fs');
 const admin = require("firebase-admin");
@@ -11,6 +12,9 @@ const sr = require('secure-random');
 const math = require('mathjs');
 const { QueryTypes, Sequelize } = require('sequelize');
 const paillierBigint = require('paillier-bigint');
+const bcu = require('bigint-crypto-utils');
+const randomInt = require('random-int');
+
 // const math = require('mathjs');
 
 const router = express.Router();
@@ -30,6 +34,60 @@ admin.initializeApp({
 });
 
 const CLIENT_THRESHOLD = 3;
+
+
+router.post('/model/global/update', verifyTokenGlobal, async (req, res) => {
+  const { model_weight, party_id } = req.body;
+  try {
+    //find party
+    const party = await Party.findOne({
+      where: {
+        id: party_id,
+      },
+    });
+
+    if (!party) {
+      return res.status(304).json({
+        code: 304,
+        message: `cannot find party id:${party_id}`
+      });
+    }
+    //Bring the devices that belongs to the party.
+    const users = await party.getUsers();
+    //iteration for FCM
+    
+    
+
+    for await (user of users) {
+      const registrationToken = await user.getToken();
+      const message = {
+        data: {
+          //update weight for each client
+          model_weight: model_weight,
+          party_id: party_id,
+        },
+        registration_ids: registrationToken
+      };
+      //promise method for sending messages
+      admin.messaging().send(message)
+        .then((response) => {
+          // Response is a message ID string.
+          console.log('Successfully sent message:', response);
+        })
+        .catch((error) => {
+          console.log('Error sending message:', error);
+        });
+    }
+
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      code: 500,
+      message: 'update failed',
+    });
+  }
+});
+
 
 router.post('/model/client/acknowledge', async (req, res) => {
 
@@ -54,17 +112,15 @@ router.post('/model/client/acknowledge', async (req, res) => {
       });
     }
 
-    let party = await sequelize.query(
-      "SELECT * FROM parties where deletedAt is null ORDER BY id desc limit 1",
-      {
-        type: QueryTypes.SELECT,
-      }
-    );
-
+    let party = await Party.findAll({
+      limit: 1,
+      order: [ ['createdAt', 'DESC']],
+    });
+    
     console.log(party);
 
     let partySize = 0;
-    let party_id = 0;
+    let partyID = 0;
 
     //if the party does not exist
     if (party.length === 0) {
@@ -74,33 +130,33 @@ router.post('/model/client/acknowledge', async (req, res) => {
         size: 0,
       });
 
-      party_id = party.id;
+      partyID = party.id;
     }
     else {
       let party_first = party.pop();
 
       partySize = party_first.size;
-      party_id = party_first.id;
+      partyID = party_first.id;
 
-      console.log(partySize, party_id);
+      console.log(partySize, partyID);
     }
-    const maskValue = 0;
-    const user_id = user.id;
+    const sizePadding = sr(1) * 0.1;
+    const userID = user.id;
 
     //Add the current user to the party.
     await sequelize.query(
-      "INSERT INTO user_party VALUES (NOW(), NOW(), :party_id, :user_id, :count, :pk_n, :pk_nSquared, :pk_g, :maskValue)",
+      "INSERT INTO user_party VALUES (NOW(), NOW(), :partyID, :userID, :count, :pk_n, :pk_nSquared, :pk_g, :sizePadding)",
       {
-        replacements: { party_id, user_id, count, pk_n, pk_nSquared, pk_g, maskValue },
+        replacements: { partyID, userID, count, pk_n, pk_nSquared, pk_g, sizePadding },
         type: QueryTypes.INSERT,
       }
     );
 
     
     await sequelize.query(
-      `UPDATE parties set size = ${partySize + 1} WHERE id = :party_id`,
+      `UPDATE parties set size = ${partySize + 1} WHERE id = :partyID`,
       {
-        replacements: { party_id },
+        replacements: { partyID },
         type: QueryTypes.UPDATE,
       }
     );
@@ -113,17 +169,19 @@ router.post('/model/client/acknowledge', async (req, res) => {
     // TODO set parties.DeletedAt NULL
     if (partySize === CLIENT_THRESHOLD) {
 
+      // axios.post('localhost:49953/v1/send/')
+
       //use SELECT statements with inner join to find users who belong to Party;
       const users = await sequelize.query(
-        "SELECT L.id, (SELECT tokenId FROM token WHERE id = L.tokenId) as tokenValue, R.dataCount as size, R.pk_n AS PK1, R.pk_nSquared AS PK2, R.pk_g AS PK3, R.maskValue from `users` AS L JOIN user_party AS R ON L.id = R.UserId WHERE R.partyId = :party_id;",
+        "SELECT L.id, (SELECT tokenId FROM token WHERE id = L.tokenId) as tokenValue, R.dataCount as size, R.pk_n AS PK1, R.pk_nSquared AS PK2, R.pk_g AS PK3, R.sizePadding AS sizePadding from `users` AS L JOIN user_party AS R ON L.id = R.UserId WHERE R.partyId = :partyID;",
         {
-          replacements: { party_id },
+          replacements: { partyID },
           type: QueryTypes.SELECT,
         }
       );
       
       await Party.destroy({
-        where: { id: party_id }
+        where: { id: partyID }
       });
 
       // 마스킹 테이블 작성
@@ -143,57 +201,64 @@ router.post('/model/client/acknowledge', async (req, res) => {
       console.log(maskTable);
 
       //저장해야 하는가? ㅇㅇ
-      const sizePadding = sr(1)[0] % 10007;
 
       let publicKeys = [];
 
-      let plainIndex = 1;
-      let total_size = 0;
+      let plainIndex = 0;
+      let totalSize = 0;
       //encrypt indices
+      axios.post(`http://localhost:49953/v1/size/${sizePadding}`)
+      .then((res) => {
+        console.log(res);
+      })
+      .catch((err) => {
+        console.error(err);
+      });
       users.forEach((user) => {
 
         console.log(user);
 
         plainIndex += 1;
-        total_size += user.size;
+        totalSize += user.size;
 
         const n = BigInt(user.PK1);
+        const nSquared = BigInt(user.PK2);
         const g = BigInt(user.PK3);
         const publicKey = new paillierBigint.PublicKey(n, g);
         
-        const A = sr(1)[0];
-        const B = A * plainIndex;
-        const encryptedIndexA = publicKey.encrypt(A);
-        const encryptedIndexB = publicKey.encrypt(B);
-        user.encryptedIndex = encryptedIndexA + " " + encryptedIndexB;
+        // A*x + B = C
 
-        // console.log(plainIndex);
-        // console.log(encryptedIndexA);
-        // console.log(encryptedIndexB);
-        
+        const A = sr(1)[0];
+        const B = sr(1)[0];
+        const C = A * plainIndex + B;
+        const encryptedIndexA = publicKey.encrypt(BigInt(A));
+        const encryptedIndexB = publicKey.encrypt(BigInt(B));
+        const encryptedIndexC = publicKey.encrypt(BigInt(C));
+
+        user.encryptedIndex = encryptedIndexA + "," + encryptedIndexB + "," + encryptedIndexC;
+
         publicKeys.push({
           n: user.PK1,
           nSquared: user.PK2,
           g: user.PK3,
         });
-
-        let ratio = user.size / total_size;
-        // console.log(user.tokenValue);
-
-        let temptks = [];
-        temptks.push(user.tokenValue);
-
+      });
+      
+      for await (const user of users){
+        let ratio = user.size / totalSize * sizePadding;
+        let singleToken = [user.tokenValue, ];
+  
         try {
-          const jsonStr = JSON.stringify({ "maskTable": maskTable.toString(), "index": user.encryptedIndex, "ratio": ratio.toString() });
+          const jsonStr = JSON.stringify({ "maskTable": maskTable.toString(), "index": user.encryptedIndex, "ratio": ratio.toString(), "partyId": partyID.toString() });
           console.log(jsonStr);
           const msg = {
-            data: {title: 'weightRequest', body: jsonStr },
-            tokens: temptks,
+            data: { title: 'weightRequest', body: jsonStr },
+            tokens: singleToken,
             priority: '10',
           };
-
+  
           // console.log(msg.data);
-
+  
           //send message
           admin.messaging().sendMulticast(msg)
               .then((response) => {
@@ -207,17 +272,15 @@ router.post('/model/client/acknowledge', async (req, res) => {
           } catch (error) {
             console.log(error);
           }
-
-      });
+      }
       
     }
-
     
     return res.status(201).json({
       code: 201,
       message: "accept acknowledge",
-
     });
+
   } catch (error) {
     console.log(error);
     return res.status(500).json({
