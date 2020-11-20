@@ -141,7 +141,7 @@ router.post('/model/client/acknowledge', async (req, res) => {
       partySize = party_first.size;
       partyID = party_first.id;
       console.log(logStr, "Selected Party ID:", partyID);
-      console.log(logStr, "Selected Party Size:", partyID);
+      console.log(logStr, "Selected Party Size:", partySize);
     }
     const sizePadding = sr(1) * 0.1;
     const userID = user.id;
@@ -246,7 +246,7 @@ router.post('/model/client/acknowledge', async (req, res) => {
         user.encryptedIndex = encryptedIndexA + "," + encryptedIndexB + "," + encryptedIndexC;
 
         console.log(logStr, "Make A*x + B = C");
-        console.log(logStr, `user ${user.id}'s A = ${A}, B = ${A}, C = ${A}`);
+        console.log(logStr, `user ${user.id}'s A = ${A}, B = ${B}, C = ${C}`);
         console.log(logStr, `user ${user.id}'s encrypted A = ${encryptedIndexA}`);
 
         publicKeys.push({
