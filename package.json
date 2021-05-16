@@ -40,7 +40,7 @@
     "secure-random": "^1.1.2",
     "seed-random": "^2.2.0",
     "sequelize": "^6.3.5",
-    "socket.io": "^2.3.0",
+    "socket.io": "^2.4.0",
     "ws": "^7.3.1"
   }
 }
