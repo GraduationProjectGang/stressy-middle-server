@@ -7,7 +7,7 @@
     "dev": "nodemon notification"
   },
   "dependencies": {
-    "axios": "^0.21.0",
+    "axios": "^0.21.1",
     "bcrypt": "^5.0.0",
     "bigint-crypto-utils": "^3.0.9",
     "bigint-mod-arith": "^2.0.8",
